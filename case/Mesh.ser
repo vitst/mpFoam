@@ -1,0 +1,5 @@
+#!/bin/bash
+
+blockMesh 2>&1 | tee log.blockmesh
+
+snappyHexMesh -overwrite 2>&1 | tee log.SHM

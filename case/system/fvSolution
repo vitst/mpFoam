@@ -1,0 +1,90 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.2.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    p
+    {
+        solver                  GAMG;
+        smoother                GaussSeidel;
+        cacheAgglomeration      true;
+        nCellsInCoarsestLevel   20;
+        agglomerator            faceAreaPair;
+        mergeLevels             1;
+        tolerance               1e-8;
+        relTol                  4e-2;
+    }
+
+    U
+    {
+        solver                  smoothSolver;
+        smoother                symGaussSeidel;
+        tolerance               1e-8;
+        relTol                  0.01;
+        nSweeps                 10;
+    }
+
+    C
+    {
+        solver                  GAMG;
+        smoother                GaussSeidel;
+        agglomerator            faceAreaPair;
+        nCellsInCoarsestLevel   20;
+        mergeLevels             1;
+        tolerance               1e-8;
+        relTol                  1e-2;
+    }
+
+    cellMotionU
+    {
+        solver                  PCG;
+        preconditioner          DIC;
+        tolerance               1e-3;
+        relTol                  1e-2;
+    }
+}
+
+SIMPLE
+{
+    nNonOrthogonalCorrectors    5;
+    consistent                yes;
+    pRefCell                    0;
+    pRefValue                   0;
+
+    residualControl
+    {
+        p                       1e-6;
+        U                       1e-6;
+    }
+}
+
+relaxationFactors
+{
+    equations
+    {
+        U               0.75;
+        //".*"            0.95; // 0.9 is more stable but 0.95 more convergent
+    }
+}
+
+convDiff
+{
+    tolerance                   1e-6;
+    maxIter                     1000;
+}
+
+// ************************************************************************* //
