@@ -502,6 +502,15 @@ public:
             const volScalarField& T
         ) = 0;
 
+        //- Return the heat transfer matrices
+        virtual tmp<fvScalarMatrix> preRect
+        (
+            const volScalarField& C,
+	    const dimensionedScalar& molW,
+	    volScalarField& SuOutput
+        ) = 0;
+
+
         //- Calculate mass transfer
         //virtual void massTransfer(const volScalarField& T) = 0;
 

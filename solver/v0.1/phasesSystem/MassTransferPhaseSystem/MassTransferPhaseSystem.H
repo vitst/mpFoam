@@ -126,6 +126,9 @@ public:
         //- Return the heat transfer matrix and fill dmdt for phases
         virtual  tmp<fvScalarMatrix> heatTransfer(const volScalarField& T);
 
+	//- Return the species source matrix and fill dmdt for phase
+	virtual tmp<fvScalarMatrix> preRect(const volScalarField& C, const dimensionedScalar& molW, volScalarField& SuOutput);
+
 
         //- Calculate mass transfer for species
         virtual void massSpeciesTransfer

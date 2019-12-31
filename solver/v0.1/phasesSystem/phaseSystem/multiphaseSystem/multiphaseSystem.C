@@ -121,10 +121,13 @@ void Foam::multiphaseSystem::calculateSuSp()
 {
     forAllConstIters(totalPhasePairs_, iter)
     {
+	const fvMesh& mesh = this->mesh();
         const phasePair& pair = iter()();
 
         const phaseModel& phase1 = pair.phase1();
+	Info<< "calculateSuSp phase1: "<< phase1.name()<<endl;
         const phaseModel& phase2 = pair.phase2();
+	Info<< "calculateSuSp phase2: "<< phase2.name() <<endl;
 
         const volScalarField& alpha1 = pair.phase1();
         const volScalarField& alpha2 = pair.phase2();
@@ -262,6 +265,14 @@ void Foam::multiphaseSystem::calculateSuSp()
                 ddtAlphaMax_.value(),
                 max(gMax((dmdt21*coeffs1)()), gMax((dmdt12*coeffs2)()))
             );
+	
+	if (mesh.time().outputTime())
+        {
+		SuPhase1.write();
+		SuPhase2.write();
+		SpPhase1.write();
+		SpPhase2.write();
+        }
     }
 }
 
@@ -440,6 +451,7 @@ void Foam::multiphaseSystem::solve()
         phasei = 0;
         for (phaseModel& phase : phases_)
         {
+	    Info<< "calculate phase: "<< phase.name()<<endl;
             volScalarField& alpha1 = phase;
 
             const volScalarField::Internal& Su = Su_[phase.name()];

@@ -16,4 +16,4 @@ phaseSystem/multiphaseSystem/multiphaseSystem.C
 phaseSystem/multiphaseSystem/multiphaseSystemNew.C
 phaseSystem/multiphaseSystem/multiphaseSystems.C
 
-LIB = $(FOAM_LIBBIN)/libIncompressibleMultiphaseSystems
+LIB = $(FOAM_LIBBIN)/libIncompressibleMultiphaseSystemsNew

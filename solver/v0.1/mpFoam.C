@@ -24,7 +24,7 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Application
-    icoReactingMultiphaseInterFoam
+    mpFoam
 
 Group
     grpMultiphaseSolvers
@@ -106,9 +106,9 @@ int main(int argc, char *argv[])
         {
             solve(fvm::ddt(rho) + fvc::div(rhoPhi));
             #include "UEqn.H"
-            #include "YEqns.H"
-            #include "TEqn.H"
-	    #include "CEqn.H"
+            //#include "YEqns.H"
+            //#include "TEqn.H"
+	        #include "CEqn.H"
 
             // --- Pressure corrector loop
             while (pimple.correct())

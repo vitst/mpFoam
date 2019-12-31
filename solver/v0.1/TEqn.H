@@ -17,9 +17,10 @@
       - fvm::Sp(fvc::ddt(rhoCp) + fvc::div(rhoCpPhi), T)
       - fvm::laplacian(kappaEff, T,  "laplacian(kappa,T)")
       ==
-        fluid.heatTransfer(T)
-      + radiation->ST(T)
-      + fvOptions(rhoCp, T)
+//        fluid.heatTransfer(T)
+//      + radiation->ST(T)
+//      +
+	 fvOptions(rhoCp, T)
     );
 
     TEqn.relax();

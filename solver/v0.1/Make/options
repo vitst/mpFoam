@@ -24,7 +24,7 @@ EXE_LIBS = \
     -lcompressibleTransportModels \
     -lradiationModels \
     -lfluidThermophysicalModels \
-    -lIncompressibleMultiphaseSystems \
+    -lIncompressibleMultiphaseSystemsNew \
     -lCompressibleMultiPhaseTurbulenceModels \
     -lmassTransferModelsNew \
     -lsolidThermo \
