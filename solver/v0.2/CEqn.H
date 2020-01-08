@@ -37,7 +37,7 @@
 
     fvScalarMatrix CEqn
     (
-        fvm::ddt(alpha_liquid,C)
+        fvm::ddt(C)
       + fvm::div(phi, C, "div(phi,T)")
       - fvm::laplacian(diffEff, C,  "laplacian(kappa,T)")
       ==
