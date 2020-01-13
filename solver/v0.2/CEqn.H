@@ -3,7 +3,7 @@
 //    phaseModel& solidPhase = fluid.phase(1);
     phaseModel& liquidPhase = fluid.phase(0);
 //    const volScalarField& alpha_solid = solidPhase;
-    const volScalarField& alpha_liquid = liquidPhase;
+    volScalarField alpha_liquid = liquidPhase;
     //mesh.lookupObject<volScalarField>("alpha.solid").oldTime();
     
     forAll(mesh.C(),i)

@@ -120,13 +120,15 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
         const volVectorField gradTo(fvc::grad(to));
 
         const volScalarField areaDensity("areaDensity", mag(gradFrom));
-	Info<< "areaDensity dimensions: "<<areaDensity.dimensions()<<endl;
 
         const volScalarField gradAlphaf(gradFrom & gradTo);
 
         volScalarField Cmask("Cmask", from*0.0);
-	Info<< "calculate Cmask..." <<endl;
+        Cmask.correctBoundaryConditions();
+    	Info<< "calculate Cmask..." <<endl;
 
+        // mark cells that is next to the solid phase cell
+        // within same processor
         forAll(Cmask, celli)
         {
             if (gradAlphaf[celli] < 0)
@@ -142,7 +144,8 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
                     }
                 }
             }
-	    bool flag = false;
+            //- check nearby cell within same processor
+	        bool flag = false;
 	        forAll(mesh.cellCells()[celli],cellj)
 	        {
 		
@@ -160,7 +163,28 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 		        Cmask[celli] = 0.0;
 	        }
         }
-	Info<< "Cmask min/max: "<< min(Cmask).value()<<" / "<<max(Cmask).value()<<endl;
+
+        //- check mesh boundaries of the processor
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const fvPatchScalarField& pf = to.boundaryField()[patchI];
+            const labelList& faceCells = pf.patch().faceCells();
+
+            //- Coupled boundaries (processor, cylic, etc)
+            if(pf.coupled())
+            {
+                scalarField neighbors = pf.patchNeighbourField();
+
+                forAll(faceCells, faceI)
+                {
+                    if (neighbors[faceI] > alphaSolidMin_)
+                    {
+                        Cmask[faceCells[faceI]] = 1.0;
+                    }
+                }
+            }
+        }
+
 
         tmp<volScalarField> tRhom
         (
