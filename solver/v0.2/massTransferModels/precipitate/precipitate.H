@@ -141,7 +141,7 @@ class precipitate
 {
     // Private data
 
-        //- Evaporation coefficient
+        //- Precipitation coefficient
         dimensionedScalar C_;
 
         //- Activation temperature

@@ -48,10 +48,10 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 )
 :
     InterfaceCompositionModel<Thermo, OtherThermo>(dict, pair),
-    C_("C", dimless, dict),
+    C_("C", dimVelocity, dict),
     Tactivate_("Tactivate", dimTemperature, dict),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
-    Mv_("Mv", dimMass/dimMoles, -1, dict),
+    Mv_("Mv", dimMass/dimMoles, dict),
     alphaMax_(dict.lookupOrDefault<scalar>("alphaMax", 1.0)),
     alphaMin_(dict.lookupOrDefault<scalar>("alphaMin", 0.5)),
     alphaSolidMin_(dict.lookupOrDefault<scalar>("alphaSolidMin", 0.5)),
@@ -105,9 +105,16 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 
         const dimensionedScalar convConst
         (
-		"convConst",
-		dimLength/dimTime,
-		1.0
+            "convConst",
+            dimLength/dimTime,
+            1.0
+        );
+
+        const dimensionedScalar convConstVol
+        (
+            "convConstVol",
+            dimArea,
+            1.0
         );
 
         word fullSpeciesName = this->transferSpecie();
@@ -115,11 +122,16 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
         const word speciesName(fullSpeciesName.substr(0, tempOpen));
 
 
-
         const volVectorField gradFrom(fvc::grad(from));
         const volVectorField gradTo(fvc::grad(to));
 
-        const volScalarField areaDensity("areaDensity", mag(gradFrom));
+        const volScalarField areaDensity
+        (
+            "areaDensity",
+            mag(gradFrom)*4*from*(1-from)
+        );
+
+        Info<< "areaDensity dimensions: "<<areaDensity.dimensions()<<endl;
 
         const volScalarField gradAlphaf(gradFrom & gradTo);
 
@@ -185,7 +197,6 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
             }
         }
 
-
         tmp<volScalarField> tRhom
         (
             new volScalarField
@@ -221,17 +232,17 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
             )
         );
         volScalarField& tDelta = tTdelta.ref();
-	Info<< "calculate rhom&tDelta..."<<endl;
+	    Info<< "calculate rhom&tDelta..."<<endl;
 
         if (sign(C_.value()) > 0)
         {
+            //- convert molar mass to kg/mol for OpenFOAM
             rhom =
-                this->pair().to().rho()*this->pair().from().rho()
-              / this->pair().from().rho();
+                C*Mv_*1e-3;
 
             tDelta = max
             (
-                (C*Cmask - Cactivate_)/dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
+                pos(C*Cmask - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
                 dimensionedScalar("C0", dimless, Zero)
             );
         }
@@ -247,12 +258,12 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
                 dimensionedScalar("C0", dimless, Zero)
             );
         }
-	Info<< "calculate massFluxPrec..."<<endl;
+	    Info<< "calculate massFluxPrec..."<<endl;
 
         volScalarField massFluxPrec
         (
             "massFluxPrec",
-            mag(C_)
+            C_
           * rhom
           * tDelta
         );
@@ -260,35 +271,34 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
         // 'from' phase normalization
         // WIP: Normalization could be convinient for cases where the area were
         // the source term is calculated is uniform
-        const dimensionedScalar Nl
-        (
-            gSum((areaDensity*mesh.V())())
-           /(
-               gSum
-               (
-                   ((areaDensity*from)*mesh.V())()
-               )
-             + dimensionedScalar("SMALL", dimless, VSMALL)
-            )
-        );
+//        const dimensionedScalar Nl
+//        (
+//            gSum((areaDensity*mesh.V())())
+//           /(
+//               gSum
+//               (
+//                   ((areaDensity*from)*mesh.V())()
+//               )
+//             + dimensionedScalar("SMALL", dimless, VSMALL)
+//            )
+//        );
 
 
         if (mesh.time().outputTime())
         {
             areaDensity.write();
             Cmask.write();
-            volScalarField mKGasDot
-            (
-                "mKGasDot",
-                massFluxPrec*areaDensity*Nl*from
-            );
-            mKGasDot.write();
+//            volScalarField mKGasDot
+//            (
+//                "mKGasDot",
+//                massFluxPrec*areaDensity*Nl*from
+//            );
+//            mKGasDot.write();
         }
 
 	Info<< "massFluxPrec dimensions: "<<massFluxPrec.dimensions()<<endl;
-	Info<< "from dimensions: "<<from.dimensions()<<endl;
 
-        return massFluxPrec*convConst*areaDensity*Nl*from;
+        return massFluxPrec*areaDensity;
     }
     else
     {
