@@ -9,6 +9,10 @@
     forAll(mesh.C(),i)
     {
 		diffEff[i] = diffInLiquid.value()*pow(alpha_liquid[i],2);
+        if(diffEff[i]<1e-16)
+        {
+            diffEff[i]=0.0;
+        }
     }
  
     Info<< "min/max(diffEff) = " << min(diffEff).value() << ", " << max(diffEff).value() << endl;

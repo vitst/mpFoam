@@ -296,7 +296,33 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 //            mKGasDot.write();
         }
 
-	Info<< "massFluxPrec dimensions: "<<massFluxPrec.dimensions()<<endl;
+    	Info<< "massFluxPrec dimensions: "<<massFluxPrec.dimensions()<<endl;
+
+        
+        //- Constrain the reaction rate to prevent negative concentration
+        forAll(mesh.C(), cellI)
+        {
+            if(massFluxPrec[cellI]*areaDensity[cellI]*mesh.time().deltaTValue()
+                > (C[cellI]-Cactivate_.value())*Mv_.value()*1e-3)
+                {
+                    massFluxPrec[cellI] = (C[cellI]-Cactivate_.value())*Mv_.value()*1e-3
+                                        / (mesh.time().deltaTValue()*areaDensity[cellI]+VSMALL);
+                }
+        }
+
+//        const volScalarField massVolRateRef
+//        (
+//            IOobject
+//                (
+//                    "massVolRateRef",
+//                    mesh.time().timeName(),
+//                    mesh,
+//                    IOobject::NO_READ,
+//                    IOobject::NO_WRITE
+//                ),
+//                mesh,
+//                1.0
+//        );
 
         return massFluxPrec*areaDensity;
     }
