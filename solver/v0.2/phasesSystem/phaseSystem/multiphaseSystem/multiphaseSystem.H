@@ -41,6 +41,9 @@ SourceFiles
 #include "UPtrList.H"
 #include "phasePairKey.H"
 
+#include <iostream>
+#include <fstream>
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -83,6 +86,16 @@ protected:
 
         //- Sp phase source terms
         SuSpTable Sp_;
+
+        //- Mass balance check in simulation domain
+        dimensionedScalar solidMass_;
+        dimensionedScalar liquidMass_;
+        dimensionedScalar solidMassOld_;
+        dimensionedScalar liquidMassOld_;
+        dimensionedScalar dmdtTot_;
+        dimensionedScalar dmdtTotOld_;
+        dimensionedScalar deltaT_;
+        dimensionedScalar deltaTOld_;
 
 
     // Protected members

@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "MultiComponentPhaseModel.C": "cpp",
+        "phaseSystem.C": "cpp",
+        "multiphaseSystem.C": "cpp",
+        "StaticPhaseModel.C": "cpp",
+        "MassTransferPhaseSystem.C": "cpp",
+        "precipitate.C": "cpp"
+    }
+}

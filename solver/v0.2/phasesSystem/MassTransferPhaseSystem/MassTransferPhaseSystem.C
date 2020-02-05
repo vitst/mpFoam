@@ -165,9 +165,9 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::dmdt
 
     if (dmdt_.found(key))
     {
-	Info<<"dmdt with key "<<key<<endl;
+//	    Info<<"dmdt with key "<<key<<endl;
         dmdt = *dmdt_[key];
-	Info<<"dmdt min/max "<<min(dmdt).value()<< " / " << max(dmdt).value()<<endl;
+//	    Info<<"dmdt min/max "<<min(dmdt).value()<< " / " << max(dmdt).value()<<endl;
     }
 
     return tdmdt;
@@ -239,14 +239,13 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::preRect
 
                     if (Kexp.valid())
                     {
-			Info<< "Fluid to solid calculated!" << endl;
+			            Info<< "Fluid to solid calculated!" << endl;
                         dmdtNetki += Kexp.ref();
                         *dmdt_[keyik] = Kexp.ref();
 		
                     }
                 }
-                Info<< "keyik "<< keyik << endl;
-		Info<< "Reaction rate(min/max): " << min(dmdtNetki).value() << ", " << max(dmdtNetki).value() << endl;	
+//		        Info<< "Reaction rate(min/max): " << min(dmdtNetki).value() << ", " << max(dmdtNetki).value() << endl;	
                 // Looking for mass transfer in the other direction (k to i)
                 if (massTransferModels_.found(keyki))
                 {
@@ -259,7 +258,7 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::preRect
 
                     if (Kexp.valid())
                     {
-			Info<< "Solid to fluid calculated!" << endl;
+			            Info<< "Solid to fluid calculated!" << endl;
                         dmdtNetki -= Kexp.ref();
                         *dmdt_[keyki] = Kexp.ref();
 			
@@ -269,8 +268,6 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::preRect
                 word keyikName(phasei.name() + phasek.name());
                 word keykiName(phasek.name() + phasei.name());
 
-		Info<< "keyki "<< keyki << endl;
-		Info<< "Reaction rate(min/max): " << min(dmdtNetki).value() << ", " << max(dmdtNetki).value() << endl;
 		SuOutput = dmdtNetki;
                 eqn -=
                     (

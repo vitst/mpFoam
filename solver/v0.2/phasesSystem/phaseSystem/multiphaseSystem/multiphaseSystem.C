@@ -44,6 +44,9 @@ License
 #include "fvmSup.H"
 #include "CMULES.H"
 
+#include <iostream>
+#include <fstream>
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -65,7 +68,15 @@ Foam::multiphaseSystem::multiphaseSystem
     ddtAlphaMax_(0.0),
     limitedPhiAlphas_(phaseModels_.size()),
     Su_(phaseModels_.size()),
-    Sp_(phaseModels_.size())
+    Sp_(phaseModels_.size()),
+    solidMass_(0.0),
+    liquidMass_(0.0),
+    solidMassOld_(0.0),
+    liquidMassOld_(0.0),
+    dmdtTot_(0.0),
+    dmdtTotOld_(0.0),
+    deltaT_(0.0),
+    deltaTOld_(0.0)
 {
     label phasei = 0;
     phases_.setSize(phaseModels_.size());
@@ -125,9 +136,9 @@ void Foam::multiphaseSystem::calculateSuSp()
         const phasePair& pair = iter()();
 
         const phaseModel& phase1 = pair.phase1();
-	Info<< "calculateSuSp phase1: "<< phase1.name()<<endl;
+	    Info<< "calculateSuSp phase1: "<< phase1.name()<<endl;
         const phaseModel& phase2 = pair.phase2();
-	Info<< "calculateSuSp phase2: "<< phase2.name() <<endl;
+	    Info<< "calculateSuSp phase2: "<< phase2.name() <<endl;
 
         const volScalarField& alpha1 = pair.phase1();
         const volScalarField& alpha2 = pair.phase2();
@@ -551,6 +562,9 @@ void Foam::multiphaseSystem::solve()
 
             // Reset rhoPhi
             rhoPhi_ = dimensionedScalar("rhoPhi", dimMass/dimTime, Zero);
+            solidMassOld_ = solidMass_;
+            liquidMassOld_ = liquidMass_;
+            dmdtTotOld_ = dmdtTot_;
 
             for (phaseModel& phase : phases_)
             {
@@ -559,14 +573,68 @@ void Foam::multiphaseSystem::solve()
 
                 // Update rhoPhi
                 rhoPhi_ += fvc::interpolate(phase.rho()) * phase.alphaPhi();
-
+                if(phase.name()=="solid")
+                {
+                    solidMass_ = gSum((mesh_.V()*phase.rho()*alpha1)());
+                }
+                else if (phase.name()=="liquid")
+                {
+                    liquidMass_ = gSum((mesh_.V()*phase.rho()*alpha1)());
+                }
+//                Info<< "Phase density: " << min(phase.rho()) << ' ' << max(phase.rho()) << endl;
             }
+
+            const phasePairKey key12
+            (
+                "liquid",
+                "solid",
+                true
+            );
+
+            tmp<volScalarField> tdmdt12(this->dmdt(key12));
+            const volScalarField& dmdt12 = tdmdt12();
+
+            dmdtTot_ = gSum((mesh_.V()*dmdt12)());
+            deltaTOld_ = deltaT_;
+            deltaT_ = mesh_.time().deltaTValue();
 
             Info<< "Phase-sum volume fraction, min, max = "
                 << sumAlpha.weightedAverage(mesh_.V()).value()
                 << ' ' << min(sumAlpha).value()
                 << ' ' << max(sumAlpha).value()
                 << endl;
+
+            Info<< "Total solid phase weight = "
+                << solidMass_.value()
+                << endl;
+
+            Info<< "Total liquid phase weight = "
+                << liquidMass_.value()
+                << endl;
+
+            Info<< "Total dmdt = "
+                << dmdtTot_.value()
+                << endl;
+
+            dimensionedScalar massErrRel = (dmdtTot_*deltaT_-(solidMass_-solidMassOld_))/(solidMass_-solidMassOld_)*100;
+
+            if(Pstream::master() && mesh.time().outputTime())
+            {
+                string fileName = "outputResults.csv";
+                std::ifstream file(fileName);
+                std::fstream fout;
+                fout.open(fileName, std::ios::out | std::ios::app);
+                if (file.peek() == std::ifstream::traits_type::eof())
+                {
+                    fout << "Time[s], solidMass[kg], liquidMass[kg], dmdt[kg/s], deltaT[s], massErrRel[%]" << "\n";
+                }
+                fout << mesh_.time().timeName() << ", "
+                    << solidMass_.value() << ", "
+                    << liquidMass_.value() << ", "
+                    << dmdtTot_.value() << ", "
+                    << mesh_.time().deltaTValue() << ", "
+                    << massErrRel.value() << "\n";
+            }
 
             volScalarField sumCorr(1.0 - sumAlpha);
 

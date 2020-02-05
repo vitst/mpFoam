@@ -128,7 +128,7 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
         const volScalarField areaDensity
         (
             "areaDensity",
-            mag(gradFrom)*4*from*(1-from)
+            mag(gradFrom)//*4*from*(1-from)
         );
 
         Info<< "areaDensity dimensions: "<<areaDensity.dimensions()<<endl;
@@ -245,6 +245,7 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
                 pos(C*Cmask - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
                 dimensionedScalar("C0", dimless, Zero)
             );
+//            Info<<"tDelta: " << tDelta << endl;
         }
         else
         {
@@ -267,6 +268,8 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
           * rhom
           * tDelta
         );
+
+        Info<< "massFluxPrec min/max: " << min(massFluxPrec).value() << " " << max(massFluxPrec).value() << endl;
 
         // 'from' phase normalization
         // WIP: Normalization could be convinient for cases where the area were
@@ -296,14 +299,14 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 //            mKGasDot.write();
         }
 
-    	Info<< "massFluxPrec dimensions: "<<massFluxPrec.dimensions()<<endl;
+//    	Info<< "massFluxPrec dimensions: "<<massFluxPrec.dimensions()<<endl;
 
         
         //- Constrain the reaction rate to prevent negative concentration
         forAll(mesh.C(), cellI)
         {
             if(massFluxPrec[cellI]*areaDensity[cellI]*mesh.time().deltaTValue()
-                > (C[cellI]-Cactivate_.value())*Mv_.value()*1e-3)
+                > pos(C[cellI]-Cactivate_.value())*Mv_.value()*1e-3)
                 {
                     massFluxPrec[cellI] = (C[cellI]-Cactivate_.value())*Mv_.value()*1e-3
                                         / (mesh.time().deltaTValue()*areaDensity[cellI]+VSMALL);
@@ -323,6 +326,7 @@ Foam::meltingEvaporationModels::precipitate<Thermo, OtherThermo>
 //                mesh,
 //                1.0
 //        );
+//        Info<< "precipitate reture: " << min(massFluxPrec*areaDensity).value() << max(massFluxPrec*areaDensity).value() << endl;
 
         return massFluxPrec*areaDensity;
     }
