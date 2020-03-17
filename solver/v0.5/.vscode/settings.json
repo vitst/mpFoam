@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "mpFoam.C": "cpp",
+        "phaseChangeReaction.C": "cpp"
+    }
+}

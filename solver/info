@@ -1,1 +1,13 @@
 this is a directory for the solver
+
+MVP1
+--Basic solver with solid phase precipitation capability
+
+v0.4
+--Added adapted mesh refinement function
+--Validated against analytical solution for interface propagation
+
+v0.5
+# in construction
+--Added nucleation module basing on the surface energy correlation
+
