@@ -31,7 +31,7 @@ Description
     thermodynamic models either side of the interface.
 
 SourceFiles
-    InterfaceCompositionModel.C
+    phaseChangeReaction.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -62,6 +62,9 @@ protected:
 
         //- Constant interfacial porosity coefficient
         const scalar Cu_;
+
+        //- pKsp for dissolution/precipitation species
+        const scalar pKsp_;
 
         //- Precipitation coefficient
         dimensionedScalar K_;
@@ -134,6 +137,10 @@ public:
     //- Return mass reaction term for CEqn
     virtual tmp<fvScalarMatrix> preRect(const volScalarField& C, volScalarField& SuOutput);
 
+    //- Return nucleation site basing on concentration field
+    virtual void nuSiteCal(volScalarField& nuSite);
+    virtual tmp<volScalarField> CtoSI();
+    virtual tmp<volScalarField> nuPoss();
     
 };
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

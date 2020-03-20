@@ -96,6 +96,20 @@ volScalarField diffCo
     mesh
 );
 
+Info<< "Reading field for nucleation\n" << endl;
+volScalarField nuSite
+(
+    IOobject
+    (
+        "nuSite",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh
+);
+
 Info<< "Reading transportProperties\n" << endl;
 immiscibleIncompressibleTwoPhaseMixture mixture(U, phi);
 

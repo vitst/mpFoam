@@ -53,6 +53,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
 )
 :
     Cu_(dict.get<scalar>("Cu")),
+    pKsp_(dict.get<scalar>("pKsp")),
     K_("K", dimVelocity, dict),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
     Mv_("Mv", dimMass/dimMoles, dict),
@@ -375,6 +376,122 @@ void Foam::phaseChangeReaction::addInterfacePorosity(fvVectorMatrix& UEqn)
     STermRef = Cu_*sqr(1.0-liquidAlpha)/(pow3(liquidAlpha) + 1e-3);
 
     Udiag += Vc*STermRef;
+}
+
+void Foam::phaseChangeReaction::nuSiteCal
+(
+    volScalarField& nuSite
+)
+{
+    //Convert C to SI through calculation
+    tmp<volScalarField> SI = CtoSI();
+
+    Info<< "SI output min/max: " << min(SI.ref()) << ", " << max(SI.ref()) << endl;
+
+    //Calculate the possibilities for nucleation
+
+
+    //Loop through wall boundary patches to estimate nucleation
+    const fvPatchList& patches = mesh_.boundary();
+    PackedBoolList isWallCell(mesh_.nCells());
+
+    forAll(patches, patchI)
+    {
+        const fvPatch& p = patches[patchI];
+        if(isType<wallFvPatch>(p))
+        {
+            forAll(p, pFaceI)
+            {
+                isWallCell.set(p.faceCells()[pFaceI]);
+            }
+        }
+    }
+
+    labelList wallList(isWallCell.count());
+    label nWallCells = 0;
+    forAll(isWallCell, celli)
+    {
+        if (isWallCell.get(celli))
+        {
+            wallList[nWallCells++] = celli;
+        }
+    }
+
+    wallList.setSize(nWallCells);
+
+    forAll(wallList, i)
+    {
+        nuSite[wallList[i]] = 1.0;
+    }
+
+}
+
+Foam::tmp<Foam::volScalarField> 
+Foam::phaseChangeReaction::CtoSI
+()
+{
+    tmp<volScalarField> SItmp 
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "SItmp",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& SItmpRef = SItmp.ref();
+
+    scalar Ksp = pow(10,-pKsp_);
+    Info<< "KSP value: " << Ksp << endl;
+
+    // mol/m3 to SI
+    forAll(mesh_.C(), cellI)
+    {
+        SItmpRef[cellI] = log10((pow(C_[cellI],2.0)+VSMALL)/Ksp);
+    };
+
+    return SItmp;
+}
+
+Foam::tmp<Foam::volScalarField> 
+Foam::phaseChangeReaction::nuPoss
+()
+{
+    tmp<volScalarField> nuRate 
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "nuRate",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& nuRateRef = nuRate.ref();
+
+    // obtain SI field from concentration
+    tmp<volScalarField> SI = CtoSI();    
+
+    forAll(mesh_.C(),cellI)
+    {
+        nuRate[cellI] = exp(lnA+(-16.0*3.14*pow(32.9,3.0)*pow(47.95,2.0)/15.9114/kbT)/(pow(SI[cellI],2.0)));
+    }
+
+
+    return SItmp;
 }
 
 Foam::phaseChangeReaction::~phaseChangeReaction(){};

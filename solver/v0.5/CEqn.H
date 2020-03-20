@@ -58,4 +58,7 @@
 
     Info<< "min/max(C) = "
         << min(C).value() << ", " << max(C).value() << endl;
+
+    //calculate nucleation sites
+    phaseChange.nuSiteCal(nuSite);
 }
