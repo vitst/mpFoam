@@ -49,7 +49,7 @@ SourceFiles
 
 namespace Foam
 {
-
+    typedef List<vector> vectorList;
 /*---------------------------------------------------------------------------*\
                   Class phaseChangeReaction Declaration
 \*---------------------------------------------------------------------------*/
@@ -65,6 +65,15 @@ protected:
 
         //- pKsp for dissolution/precipitation species
         const scalar pKsp_;
+
+        //- lnA prefactor for nucleation rate
+        const scalar lnA_;
+
+        //- gamma interfacial energy for nucleation
+        const scalar gamma_;
+
+        //- molar volume for nucleation
+        const scalar Vmol_;
 
         //- Precipitation coefficient
         dimensionedScalar K_;
@@ -95,6 +104,9 @@ protected:
 
         //- Alpha field
         const volScalarField& alpha_;
+
+        //- debug option
+        bool debug_;
 
         //- Concentration field
         const volScalarField& C_;
@@ -138,9 +150,13 @@ public:
     virtual tmp<fvScalarMatrix> preRect(const volScalarField& C, volScalarField& SuOutput);
 
     //- Return nucleation site basing on concentration field
-    virtual void nuSiteCal(volScalarField& nuSite);
+    virtual void nuSiteCal(volScalarField& nuSitei, volScalarField& cryCons, vectorList& nuSiteList);
     virtual tmp<volScalarField> CtoSI();
-    virtual tmp<volScalarField> nuPoss();
+    virtual tmp<volScalarField> nuRateCal();
+
+    //- Geometry constrain for crystal growth
+    virtual vectorList extractNuSite(const volScalarField& nuSite, vectorList& nuSiteList);
+    virtual void cryCons(const volScalarField& nuSite, volScalarField& cryDomain, vectorList& nuSiteList);
     
 };
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

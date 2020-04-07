@@ -54,6 +54,8 @@ Description
 
 #include <iostream>
 #include <fstream>
+#include <stdlib.h>
+#include <time.h>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,6 +68,8 @@ int main(int argc, char *argv[])
         "With optional mesh motion and mesh topology changes including"
         " adaptive re-meshing."
     );
+
+    srand(time(NULL));
 
     #include "postProcess.H"
 
@@ -176,6 +180,14 @@ int main(int argc, char *argv[])
                 turbulence->correct();
             }
         }
+
+        //calculate nucleation sites
+        if((floor(runTime.value())-floor(timeMarker))>=1.0)
+        {
+            phaseChange.nuSiteCal(nuSite, cryDomain, nuSiteList);
+        }
+        timeMarker = runTime.value();
+        Info<< "timeMarker = " << timeMarker << endl;
 
         runTime.write();
 

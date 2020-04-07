@@ -110,6 +110,21 @@ volScalarField nuSite
     mesh
 );
 
+Info<< "Reading field for nucleation\n" << endl;
+volScalarField cryDomain
+(
+    IOobject
+    (
+        "cryDomain",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimless, Zero)
+);
+
 Info<< "Reading transportProperties\n" << endl;
 immiscibleIncompressibleTwoPhaseMixture mixture(U, phi);
 
@@ -220,6 +235,10 @@ dimensionedScalar liquidMassOld_(0.0);
 dimensionedScalar solidMass_(0.0);
 dimensionedScalar dmdtTot_(0.0);
 dimensionedScalar deltaT_(0.0);
+
+vectorList nuSiteList;
+
+scalar timeMarker = 0.0;
 
 phaseChangeReaction phaseChange = phaseChangeReaction(inputParameters, mesh, C, alpha1);
 

@@ -34,6 +34,7 @@ License
 #include "fvcReconstruct.H"
 #include "fvm.H"
 #include "zeroGradientFvPatchFields.H"
+#include <random>
 
 using namespace Foam::constant;
 
@@ -54,6 +55,9 @@ Foam::phaseChangeReaction::phaseChangeReaction
 :
     Cu_(dict.get<scalar>("Cu")),
     pKsp_(dict.get<scalar>("pKsp")),
+    lnA_(dict.get<scalar>("lnA")),
+    gamma_(dict.get<scalar>("gamma")),
+    Vmol_(dict.get<scalar>("Vmol")),
     K_("K", dimVelocity, dict),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
     Mv_("Mv", dimMass/dimMoles, dict),
@@ -64,6 +68,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     smoothSurface_(dict.lookupOrDefault<bool>("smoothSurface", false)),
     smoothAreaDensity_(dict.lookupOrDefault<scalar>("smoothAreaDensity", 1.0)),
     alpha_(alpha),
+    debug_(dict.lookupOrDefault<bool>("debug", false)),
     C_(C),
     mesh_(mesh)
 {
@@ -380,50 +385,69 @@ void Foam::phaseChangeReaction::addInterfacePorosity(fvVectorMatrix& UEqn)
 
 void Foam::phaseChangeReaction::nuSiteCal
 (
-    volScalarField& nuSite
+    volScalarField& nuSite,
+    volScalarField& cryDomain,
+    vectorList& nuSiteList
 )
 {
-    //Convert C to SI through calculation
-    tmp<volScalarField> SI = CtoSI();
-
-    Info<< "SI output min/max: " << min(SI.ref()) << ", " << max(SI.ref()) << endl;
-
     //Calculate the possibilities for nucleation
-
+    tmp<volScalarField> nuRate = nuRateCal();
+    Info<< "Max/Min nucleation rate(n/m2/s): " << max(nuRate.ref()).value() << ", " << min(nuRate.ref()).value()<< endl;
 
     //Loop through wall boundary patches to estimate nucleation
     const fvPatchList& patches = mesh_.boundary();
-    PackedBoolList isWallCell(mesh_.nCells());
+    labelList wallList;
+    wallList.clear();
 
     forAll(patches, patchI)
     {
         const fvPatch& p = patches[patchI];
-        if(isType<wallFvPatch>(p))
+        if(p.type()=="wall")
         {
             forAll(p, pFaceI)
             {
-                isWallCell.set(p.faceCells()[pFaceI]);
+                label faceCelli = p.faceCells()[pFaceI];
+                wallList.resize(wallList.size()+1);
+                wallList[wallList.size()-1]=faceCelli;
             }
         }
     }
 
-    labelList wallList(isWallCell.count());
-    label nWallCells = 0;
-    forAll(isWallCell, celli)
-    {
-        if (isWallCell.get(celli))
-        {
-            wallList[nWallCells++] = celli;
-        }
-    }
-
-    wallList.setSize(nWallCells);
+    std::random_device rd;  //Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd());
 
     forAll(wallList, i)
     {
-        nuSite[wallList[i]] = 1.0;
+        label poss = rand() % 1000000000000 + 1;
+        const cell& faces = mesh_.cells()[wallList[i]];
+        scalar faceArea = 0.0;
+        forAll(faces, faceI)
+        {
+            if(mesh_.magSf()[faceI]>faceArea)
+            {
+                faceArea = mesh_.magSf()[faceI];
+            }
+        }
+
+        std::uniform_real_distribution<> dis(0.0, 1.0);
+
+        if(debug_)
+        {
+            Info<< "Max faceArea: " << faceArea << endl;
+            Info<< "Random integer generated: " << poss << endl;
+            Info<< "Nucleation rate: " << nuRate.ref()[wallList[i]] << endl;
+            Info<< "Computational time: " << mesh_.time().value() << endl;
+        }
+
+        if((nuRate.ref()[wallList[i]]/1e12)>(dis(gen)*faceArea*1e12))
+        {
+            nuSite[wallList[i]] = 1.0;
+        }
+        // mark cells for check, remove in running code
+        // nuSite[wallList[i]] = 1.0;
     }
 
+    cryCons(nuSite, cryDomain, nuSiteList);
 }
 
 Foam::tmp<Foam::volScalarField> 
@@ -454,14 +478,14 @@ Foam::phaseChangeReaction::CtoSI
     // mol/m3 to SI
     forAll(mesh_.C(), cellI)
     {
-        SItmpRef[cellI] = log10((pow(C_[cellI],2.0)+VSMALL)/Ksp);
+        SItmpRef[cellI] = max(0.001, log10((pow(C_[cellI],2.0)+VSMALL)/Ksp));
     };
 
     return SItmp;
 }
 
 Foam::tmp<Foam::volScalarField> 
-Foam::phaseChangeReaction::nuPoss
+Foam::phaseChangeReaction::nuRateCal
 ()
 {
     tmp<volScalarField> nuRate 
@@ -477,21 +501,107 @@ Foam::phaseChangeReaction::nuPoss
                 IOobject::NO_WRITE
             ),
             mesh_,
-            dimensionedScalar(dimless, Zero)
+            dimensionedScalar(dimArea/dimTime, Zero)
         )
     );
     volScalarField& nuRateRef = nuRate.ref();
 
     // obtain SI field from concentration
     tmp<volScalarField> SI = CtoSI();    
+    Info<< "SI output min/max: " << min(SI.ref()) << ", " << max(SI.ref()) << endl;
+
+    // define constants
+    scalar kb = 1.38064852e-23;
+    scalar NA = 6.02214076e23;
 
     forAll(mesh_.C(),cellI)
     {
-        nuRate[cellI] = exp(lnA+(-16.0*3.14*pow(32.9,3.0)*pow(47.95,2.0)/15.9114/kbT)/(pow(SI[cellI],2.0)));
+        nuRateRef[cellI] = exp(lnA_)*exp((-16.0*3.14159*pow(gamma_,3.0)*pow(Vmol_/NA,2.0))/(3.0*2.303*2.303*pow(SI.ref()[cellI],2.0)*pow(kb*293,3.0)));
     }
 
+    return nuRate;
+}
 
-    return SItmp;
+Foam::vectorList  
+Foam::phaseChangeReaction::extractNuSite
+(
+    const volScalarField& nuSite,
+    vectorList& nuSiteList
+)
+{
+    scalarList xList, yList, zList;
+    xList.clear();
+    yList.clear();
+    zList.clear();
+
+    // store the nucleation site coordinate
+    forAll(mesh_.C(), cellI)
+    {
+        if(nuSite[cellI]==1.0)
+        {
+            xList.resize(xList.size()+1);
+            yList.resize(yList.size()+1);
+            zList.resize(zList.size()+1);
+            nuSiteList.resize(nuSiteList.size()+1);
+            xList[xList.size()-1]=mesh_.C()[cellI].component(0);
+            yList[yList.size()-1]=mesh_.C()[cellI].component(1);
+            zList[zList.size()-1]=mesh_.C()[cellI].component(2);
+            nuSiteList[nuSiteList.size()-1]=mesh_.C()[cellI];
+            Info<< "Nucleation site coordinates: " << nuSiteList[nuSiteList.size()-1] << endl;
+        }
+    }
+
+    return nuSiteList;
+}
+
+void Foam::phaseChangeReaction::cryCons
+(
+    const volScalarField& nuSite,
+    volScalarField& cryDomain,
+    vectorList& nuSiteList
+)
+{
+    tmp<volScalarField> tmpCryDomain 
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "tmpCryDomain",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& tmpCryDomainRef = tmpCryDomain.ref();
+
+    vectorList nuSiteListTmp = extractNuSite(nuSite, nuSiteList);
+
+    // calculate the volume occupied by the constrained crystal domain from cell center
+    forAll(nuSiteListTmp, nuI)
+    {
+        forAll(mesh_.C(), cellI)
+        {
+            if(((nuSiteListTmp[nuI][0]-4.1e-6)<=mesh_.C()[cellI].component(0))
+                and (mesh_.C()[cellI].component(0)<=(nuSiteListTmp[nuI][0]+4.1e-6)) 
+                and ((nuSiteListTmp[nuI][1]-4.1e-6)<=mesh_.C()[cellI].component(1))
+                and (mesh_.C()[cellI].component(1)<=(nuSiteListTmp[nuI][1]+4.1e-6))
+                and ((nuSiteListTmp[nuI][2]-2.1e-6)<=mesh_.C()[cellI].component(2))
+                and (mesh_.C()[cellI].component(2)<=(nuSiteListTmp[nuI][2]+2.1e-6)))
+            {
+                cryDomain[cellI] = 1.0;
+            }
+        }
+    }
+
+    //forAll(mesh_.C(), cellI)
+    //{
+    //    cryDomain[cellI] = tmpCryDomainRef[cellI];
+    //}
 }
 
 Foam::phaseChangeReaction::~phaseChangeReaction(){};
