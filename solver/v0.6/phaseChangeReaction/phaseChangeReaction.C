@@ -58,7 +58,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     lnA_(dict.get<scalar>("lnA")),
     gamma_(dict.get<scalar>("gamma")),
     Vmol_(dict.get<scalar>("Vmol")),
-    K_("K", dimVelocity, dict),
+    K_("K", dimMoles/dimArea/dimTime, dict),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
     Mv_("Mv", dimMass/dimMoles, dict),
     alphaMax_(dict.lookupOrDefault<scalar>("alphaMax", 1.0)),
@@ -192,7 +192,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
                 IOobject::NO_WRITE
             ),
             mesh_,
-            dimensionedScalar(dimDensity, Zero)
+            dimensionedScalar(dimMass/dimMoles, Zero)
         )
     );
     volScalarField& rhom = tRhom.ref();
@@ -227,7 +227,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     {
         //- convert mol/m3 to kg/m3 for OpenFOAM
         rhom =
-            (C_-Cactivate_)*(C_-Cactivate_)*Mv_*unitConv;
+            (pow(C_,2.0)/pow(Cactivate_,2.0))*Mv_;
 
         tDelta = max
         (
@@ -290,8 +290,12 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 //                }
 //        }
 //    }
+    dimensionedScalar totReactionRate_(0.0);
+
+    totReactionRate_ = gSum((mesh_.V()*massFluxPrec*areaDensityGrad)());
 
     Info<< "precipitate return: " << min(massFluxPrec).value() << ", "<< max(massFluxPrec).value() << endl;
+    Info<< "Total reaction rate: " << totReactionRate_.value() << endl;
 
     if(smoothSurface_)
     {
