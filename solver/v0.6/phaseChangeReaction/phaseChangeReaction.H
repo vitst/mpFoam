@@ -105,6 +105,9 @@ protected:
         //- Alpha field
         const volScalarField& alpha_;
 
+        //- Cmask for solid phase region
+        volScalarField& Cmask_;
+
         //- debug option
         bool debug_;
 
@@ -129,7 +132,8 @@ public:
         const dictionary& dict,
         const fvMesh& mesh,
         const volScalarField& C,
-        const volScalarField& alpha
+        const volScalarField& alpha,
+        volScalarField& Cmask
     );
 
     //- Destructor
@@ -145,6 +149,9 @@ public:
 
     //- Add interfacial penalty term for UEqn
     void addInterfacePorosity(fvVectorMatrix& UEqn);
+
+    //- Update heterogeneous reaction region for solid phase
+    void updateCmask();
 
     //- Return mass reaction term for CEqn
     virtual tmp<fvScalarMatrix> preRect(const volScalarField& C, volScalarField& SuOutput);

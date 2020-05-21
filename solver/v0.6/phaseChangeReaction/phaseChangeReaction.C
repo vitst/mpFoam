@@ -50,7 +50,8 @@ Foam::phaseChangeReaction::phaseChangeReaction
     const dictionary& dict,
     const fvMesh& mesh,
     const volScalarField& C,
-    const volScalarField& alpha
+    const volScalarField& alpha,
+    volScalarField& Cmask
 )
 :
     Cu_(dict.get<scalar>("Cu")),
@@ -68,6 +69,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     smoothSurface_(dict.lookupOrDefault<bool>("smoothSurface", false)),
     smoothAreaDensity_(dict.lookupOrDefault<scalar>("smoothAreaDensity", 1.0)),
     alpha_(alpha),
+    Cmask_(Cmask),
     debug_(dict.lookupOrDefault<bool>("debug", false)),
     C_(C),
     mesh_(mesh)
@@ -117,67 +119,67 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     
     const volScalarField gradAlphaf(gradFrom & gradTo);
 
-    volScalarField Cmask("Cmask", from*0.0);
-    Cmask.correctBoundaryConditions();
-    Info<< "calculate Cmask..." <<endl;
+    //volScalarField Cmask("Cmask", from*0.0);
+    //Cmask.correctBoundaryConditions();
+    //Info<< "calculate Cmask..." <<endl;
 
-    // mark cells that is next to the solid phase cell
-    // within same processor
-    forAll(Cmask, celli)
-    {
-        if (gradAlphaf[celli] < 0)
-        {
-            if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
-            {
-                {
-                    scalar alphaRes = 1.0 - from[celli] - to[celli];
-                    if (alphaRes < alphaRestMax_)
-                    {
-                        Cmask[celli] = 1.0;
-                    }
-                }
-            }
-        }
-        //- check nearby cell within same processor
-        bool flag = false;
-        forAll(mesh_.cellCells()[celli],cellj)
-        {
+    //// mark cells that is next to the solid phase cell
+    //// within same processor
+    //forAll(Cmask, celli)
+    //{
+    //    if (gradAlphaf[celli] < 0)
+    //    {
+    //        if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
+    //        {
+    //            {
+    //                scalar alphaRes = 1.0 - from[celli] - to[celli];
+    //                if (alphaRes < alphaRestMax_)
+    //                {
+    //                    Cmask[celli] = 1.0;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    //- check nearby cell within same processor
+    //    bool flag = false;
+    //    forAll(mesh_.cellCells()[celli],cellj)
+    //    {
     
-            if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
-            {
-                flag = true;
-            }
-        }
-        if (flag)
-        {
-            Cmask[celli] = 1.0;
-        }
-        else
-        {
-            Cmask[celli] = 0.0;
-        }
-    }
+    //        if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
+    //        {
+    //            flag = true;
+    //        }
+    //    }
+    //    if (flag)
+    //    {
+    //        Cmask[celli] = 1.0;
+    //    }
+    //    else
+    //    {
+    //        Cmask[celli] = 0.0;
+    //    }
+    //}
 
-    //- check mesh boundaries of the processor
-    forAll(mesh_.boundaryMesh(), patchI)
-    {
-        const fvPatchScalarField& pf = to.boundaryField()[patchI];
-        const labelList& faceCells = pf.patch().faceCells();
+    ////- check mesh boundaries of the processor
+    //forAll(mesh_.boundaryMesh(), patchI)
+    //{
+    //    const fvPatchScalarField& pf = to.boundaryField()[patchI];
+    //    const labelList& faceCells = pf.patch().faceCells();
 
-        //- Coupled boundaries (processor, cylic, etc)
-        if(pf.coupled())
-        {
-            scalarField neighbors = pf.patchNeighbourField();
+    //    //- Coupled boundaries (processor, cylic, etc)
+    //    if(pf.coupled())
+    //    {
+    //        scalarField neighbors = pf.patchNeighbourField();
 
-            forAll(faceCells, faceI)
-            {
-                if (neighbors[faceI] > alphaSolidMin_)
-                {
-                    Cmask[faceCells[faceI]] = 1.0;
-                }
-            }
-        }
-    } 
+    //        forAll(faceCells, faceI)
+    //        {
+    //            if (neighbors[faceI] > alphaSolidMin_)
+    //            {
+    //                Cmask[faceCells[faceI]] = 1.0;
+    //            }
+    //        }
+    //    }
+    //} 
 
     tmp<volScalarField> tRhom
     (
@@ -231,7 +233,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 
         tDelta = max
         (
-            pos(C_*Cmask - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
+            pos(C_*Cmask_ - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
             dimensionedScalar("C0", dimless, Zero)
         );
             Info<<"rhom min/max: " << min(rhom).value() << ", "<< max(rhom).value() << endl;
@@ -254,7 +256,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     if (mesh_.time().outputTime())
     {
         areaDensityGrad.write();
-        Cmask.write();
+        //Cmask.write();
         to.write();
 //            volScalarField mKGasDot
 //            (
@@ -369,6 +371,59 @@ void Foam::phaseChangeReaction::addInterfacePorosity(fvVectorMatrix& UEqn)
     //- Voller Prakash interfacial porosity model
 
     const volScalarField& liquidAlpha = alpha_;
+    ////- Readjust in next version for better coding
+    //const volScalarField& from = alpha_;
+
+    //const volScalarField to
+    //(
+    //    "to",
+    //    1.0-alpha_
+    //);
+
+    //const volVectorField gradFrom(fvc::grad(from));
+    //const volVectorField gradTo(fvc::grad(to));
+    //const volScalarField gradAlphaf(gradFrom & gradTo);
+
+    //volScalarField Cmask("Cmask", liquidAlpha*0.0);
+    //Cmask.correctBoundaryConditions();
+    //Info<< "calculate Cmask..." <<endl;
+
+    //// mark cells that is next to the solid phase cell
+    //// within same processor
+    //forAll(Cmask, celli)
+    //{
+    //    if (gradAlphaf[celli] < 0)
+    //    {
+    //        if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
+    //        {
+    //            {
+    //                scalar alphaRes = 1.0 - from[celli] - to[celli];
+    //                if (alphaRes < alphaRestMax_)
+    //                {
+    //                    Cmask[celli] = 1.0;
+    //                }
+    //            }
+    //        }
+    //    }
+    //    //- check nearby cell within same processor
+    //    bool flag = false;
+    //    forAll(mesh_.cellCells()[celli],cellj)
+    //    {
+    
+    //        if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
+    //        {
+    //            flag = true;
+    //        }
+    //    }
+    //    if (flag)
+    //    {
+    //        Cmask[celli] = 1.0;
+    //    }
+    //    else
+    //    {
+    //        Cmask[celli] = 0.0;
+    //    }
+    //}
 
     tmp<volScalarField> STerm 
     (
@@ -388,9 +443,65 @@ void Foam::phaseChangeReaction::addInterfacePorosity(fvVectorMatrix& UEqn)
     );
     volScalarField& STermRef = STerm.ref();
 
-    STermRef = Cu_*sqr(1.0-liquidAlpha)/(pow3(liquidAlpha) + 1e-3);
+    STermRef = Cu_*sqr(1.0-liquidAlpha)/(pow3(liquidAlpha) + 1e-3)*Cmask_;
 
     Udiag += Vc*STermRef;
+}
+
+void Foam::phaseChangeReaction::updateCmask()
+{
+    //- Readjust in next version for better coding
+    const volScalarField& from = alpha_;
+
+    const volScalarField to
+    (
+        "to",
+        1.0-alpha_
+    );
+
+    const volVectorField gradFrom(fvc::grad(from));
+    const volVectorField gradTo(fvc::grad(to));
+    const volScalarField gradAlphaf(gradFrom & gradTo);
+
+    Cmask_.correctBoundaryConditions();
+    Info<< "calculate Cmask..." <<endl;
+
+    // mark cells that is next to the solid phase cell
+    // within same processor
+    forAll(Cmask_, celli)
+    {
+        if (gradAlphaf[celli] < 0)
+        {
+            if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
+            {
+                {
+                    scalar alphaRes = 1.0 - from[celli] - to[celli];
+                    if (alphaRes < alphaRestMax_)
+                    {
+                        Cmask_[celli] = 1.0;
+                    }
+                }
+            }
+        }
+        //- check nearby cell within same processor
+        bool flag = false;
+        forAll(mesh_.cellCells()[celli],cellj)
+        {
+    
+            if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
+            {
+                flag = true;
+            }
+        }
+        if (flag)
+        {
+            Cmask_[celli] = 1.0;
+        }
+        else
+        {
+            Cmask_[celli] = 0.0;
+        }
+    }
 }
 
 void Foam::phaseChangeReaction::nuSiteCal

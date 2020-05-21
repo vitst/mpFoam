@@ -52,6 +52,15 @@
 
     CEqn.solve();
 
+    //- Set solid region to saturation concentration (double dip?)
+    //forAll(mesh.C(),i)
+    //{
+		  //  if(liquidPhase[i]<0.01)
+    //    {
+    //        C[i]=Csat.value();
+    //    }
+    //}
+
     fvOptions.correct(C);
 
     //fluid.correct();

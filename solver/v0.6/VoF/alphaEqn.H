@@ -96,30 +96,36 @@
         phiCN = cnCoeff*phi + (1.0 - cnCoeff)*phi.oldTime();
     }
 
-    if (MULESCorr)
+    if (true)//MULESCorr)
     {
         #include "alphaSuSp.H"
 
-        fvScalarMatrix alpha1Eqn
-        (
-            (
-                LTS
-              ? fv::localEulerDdtScheme<scalar>(mesh).fvmDdt(alpha1)
-              : fv::EulerDdtScheme<scalar>(mesh).fvmDdt(alpha1)
-            )
-          + fv::gaussConvectionScheme<scalar>
-            (
-                mesh,
-                phiCN,
-                upwind<scalar>(mesh, phiCN)
-            ).fvmDiv(phiCN, alpha1)
-       // - fvm::Sp(fvc::ddt(dimensionedScalar("1", dimless, 1), mesh)
-       //           + fvc::div(phiCN), alpha1)
-         ==
-            Su + fvm::Sp(Sp + divU, alpha1)
-        );
+        Info<< "Time step: " << mesh.time().deltaTValue() << endl;
+        forAll(mesh.C(), cellI)
+        {
+            alpha1[cellI] = alpha1[cellI]+Su[cellI]*mesh.time().deltaTValue();
+        }
 
-        alpha1Eqn.solve();
+        //fvScalarMatrix alpha1Eqn
+        //(
+        //    (
+        //        LTS
+        //      ? fv::localEulerDdtScheme<scalar>(mesh).fvmDdt(alpha1)
+        //      : fv::EulerDdtScheme<scalar>(mesh).fvmDdt(alpha1)
+        //    )
+        //  + fv::gaussConvectionScheme<scalar>
+        //    (
+        //        mesh,
+        //        phiCN,
+        //        upwind<scalar>(mesh, phiCN)
+        //    ).fvmDiv(phiCN, alpha1)
+       //// - fvm::Sp(fvc::ddt(dimensionedScalar("1", dimless, 1), mesh)
+       ////           + fvc::div(phiCN), alpha1)
+        // ==
+        //    Su + fvm::Sp(Sp + divU, alpha1)
+        //);
+
+        //alpha1Eqn.solve();
 
         Info<< "Phase-1 volume fraction = "
             << alpha1.weightedAverage(mesh.Vsc()).value()
@@ -127,27 +133,39 @@
             << "  Max(" << alpha1.name() << ") = " << max(alpha1).value()
             << endl;
 
-        tmp<surfaceScalarField> talphaPhi1UD(alpha1Eqn.flux());
-        alphaPhi10 = talphaPhi1UD();
+        //tmp<surfaceScalarField> talphaPhi1UD(alpha1Eqn.flux());
+        //alphaPhi10 = talphaPhi1UD();
 
-        if (alphaApplyPrevCorr && talphaPhi1Corr0.valid())
+        //if (alphaApplyPrevCorr && talphaPhi1Corr0.valid())
+        //{
+        //    Info<< "Applying the previous iteration compression flux" << endl;
+        //    MULES::correct
+        //    (
+        //        geometricOneField(),
+        //        alpha1,
+        //        alphaPhi10,
+        //        talphaPhi1Corr0.ref(),
+        //        oneField(),
+        //        zeroField()
+        //    );
+
+        //    alphaPhi10 += talphaPhi1Corr0();
+        //}
+
+        //// Cache the upwind-flux
+        //talphaPhi1Corr0 = talphaPhi1UD;
+
+        // remove any solid phase error outside of interfacial region
+        Info<< "Update Cmask ... " << endl;
+        phaseChange.updateCmask();
+
+        forAll(mesh.C(),cellI)
         {
-            Info<< "Applying the previous iteration compression flux" << endl;
-            MULES::correct
-            (
-                geometricOneField(),
-                alpha1,
-                alphaPhi10,
-                talphaPhi1Corr0.ref(),
-                oneField(),
-                zeroField()
-            );
-
-            alphaPhi10 += talphaPhi1Corr0();
-        }
-
-        // Cache the upwind-flux
-        talphaPhi1Corr0 = talphaPhi1UD;
+            if(Cmask[cellI]==0.0)
+            {
+                alpha1[cellI]=1.0;
+            }
+        }   
 
         alpha2 = 1.0 - alpha1;
 
@@ -155,121 +173,143 @@
     }
 
 
-    for (int aCorr=0; aCorr<nAlphaCorr; aCorr++)
-    {
-        #include "alphaSuSp.H"
+    //for (int aCorr=0; aCorr<nAlphaCorr; aCorr++)
+    //{
+    //    #include "alphaSuSp.H"
 
-        surfaceScalarField phir(phic*mixture.nHatf());
+    //    Info<< "Time step: " << mesh.time().deltaTValue() << endl;
+    //    forAll(mesh.C(), cellI)
+    //    {
+    //        alpha1[cellI] = alpha1[cellI]+Su[cellI]*mesh.time().deltaTValue();
+    //    }
 
-        tmp<surfaceScalarField> talphaPhi1Un
-        (
-            fvc::flux
-            (
-                phiCN(),
-                cnCoeff*alpha1 + (1.0 - cnCoeff)*alpha1.oldTime(),
-                alphaScheme
-            )
-          + fvc::flux
-            (
-               -fvc::flux(-phir, alpha2, alpharScheme),
-                alpha1,
-                alpharScheme
-            )
-        );
+    //    //surfaceScalarField phir(phic*mixture.nHatf());
 
-        if (MULESCorr)
-        {
-            tmp<surfaceScalarField> talphaPhi1Corr(talphaPhi1Un() - alphaPhi10);
-            volScalarField alpha10("alpha10", alpha1);
+    //    //tmp<surfaceScalarField> talphaPhi1Un
+    //    //(
+    //    //    fvc::flux
+    //    //    (
+    //    //        phiCN(),
+    //    //        cnCoeff*alpha1 + (1.0 - cnCoeff)*alpha1.oldTime(),
+    //    //        alphaScheme
+    //    //    )
+    //    //  + fvc::flux
+    //    //    (
+    //    //       -fvc::flux(-phir, alpha2, alpharScheme),
+    //    //        alpha1,
+    //    //        alpharScheme
+    //    //    )
+    //    //);
 
-            MULES::correct
-            (
-                geometricOneField(),
-                alpha1,
-                talphaPhi1Un(),
-                talphaPhi1Corr.ref(),
-                Sp,
-                (-Sp*alpha1)(),
-                oneField(),
-                zeroField()
-            );
+    //    //if (MULESCorr)
+    //    //{
+    //    //    tmp<surfaceScalarField> talphaPhi1Corr(talphaPhi1Un() - alphaPhi10);
+    //    //    volScalarField alpha10("alpha10", alpha1);
 
-            // Under-relax the correction for all but the 1st corrector
-            if (aCorr == 0)
-            {
-                alphaPhi10 += talphaPhi1Corr();
-            }
-            else
-            {
-                alpha1 = 0.5*alpha1 + 0.5*alpha10;
-                alphaPhi10 += 0.5*talphaPhi1Corr();
-            }
-        }
-        else
-        {
-            alphaPhi10 = talphaPhi1Un;
+    //    //    MULES::correct
+    //    //    (
+    //    //        geometricOneField(),
+    //    //        alpha1,
+    //    //        talphaPhi1Un(),
+    //    //        talphaPhi1Corr.ref(),
+    //    //        Sp,
+    //    //        (-Sp*alpha1)(),
+    //    //        oneField(),
+    //    //        zeroField()
+    //    //    );
 
-            MULES::explicitSolve
-            (
-                geometricOneField(),
-                alpha1,
-                phiCN,
-                alphaPhi10,
-                Sp,
-                (Su + divU*min(alpha1(), scalar(1)))(),
-                oneField(),
-                zeroField()
-            );
-        }
+    //    //    // Under-relax the correction for all but the 1st corrector
+    //    //    if (aCorr == 0)
+    //    //    {
+    //    //        alphaPhi10 += talphaPhi1Corr();
+    //    //    }
+    //    //    else
+    //    //    {
+    //    //        alpha1 = 0.5*alpha1 + 0.5*alpha10;
+    //    //        alphaPhi10 += 0.5*talphaPhi1Corr();
+    //    //    }
+    //    //}
+    //    //else
+    //    //{
+    //    //    alphaPhi10 = talphaPhi1Un;
 
-        alpha2 = 1.0 - alpha1;
+    //    //    MULES::explicitSolve
+    //    //    (
+    //    //        geometricOneField(),
+    //    //        alpha1,
+    //    //        phiCN,
+    //    //        alphaPhi10,
+    //    //        Sp,
+    //    //        (Su + divU*min(alpha1(), scalar(1)))(),
+    //    //        oneField(),
+    //    //        zeroField()
+    //    //    );
+    //    //}
 
-        mixture.correct();
-    }
+    //    // remove any solid phase error outside of interfacial region
+    //    Info<< "Update Cmask ... " << endl;
+    //    phaseChange.updateCmask();
 
-    if (alphaApplyPrevCorr && MULESCorr)
-    {
-        talphaPhi1Corr0 = alphaPhi10 - talphaPhi1Corr0;
-        talphaPhi1Corr0.ref().rename("alphaPhi1Corr0");
-    }
-    else
-    {
-        talphaPhi1Corr0.clear();
-    }
+    //    forAll(mesh.C(),cellI)
+    //    {
+    //        if(Cmask[cellI]==0.0)
+    //        {
+    //            alpha1[cellI]=1.0;
+    //        }
+    //    }   
 
-    #include "rhofs.H"
+    //    alpha2 = 1.0 - alpha1;
 
-    if
-    (
-        word(mesh.ddtScheme("ddt(rho,U)"))
-     == fv::EulerDdtScheme<vector>::typeName
-     || word(mesh.ddtScheme("ddt(rho,U)"))
-     == fv::localEulerDdtScheme<vector>::typeName
-    )
-    {
-        rhoPhi = alphaPhi10*(rho1f - rho2f) + phiCN*rho2f;
-    }
-    else
-    {
-        if (ocCoeff > 0)
-        {
-            // Calculate the end-of-time-step alpha flux
-            alphaPhi10 =
-                (alphaPhi10 - (1.0 - cnCoeff)*alphaPhi10.oldTime())/cnCoeff;
-        }
+    //    mixture.correct();
+    //}
 
-        // Calculate the end-of-time-step mass flux
-        rhoPhi = alphaPhi10*(rho1f - rho2f) + phi*rho2f;
-    }
+//    if (alphaApplyPrevCorr && MULESCorr)
+//    {
+//        talphaPhi1Corr0 = alphaPhi10 - talphaPhi1Corr0;
+//        talphaPhi1Corr0.ref().rename("alphaPhi1Corr0");
+//    }
+//    else
+//    {
+//        talphaPhi1Corr0.clear();
+//    }
+//
+//    #include "rhofs.H"
+//
+//    if
+//    (
+//        word(mesh.ddtScheme("ddt(rho,U)"))
+//     == fv::EulerDdtScheme<vector>::typeName
+//     || word(mesh.ddtScheme("ddt(rho,U)"))
+//     == fv::localEulerDdtScheme<vector>::typeName
+//    )
+//    {
+//        rhoPhi = alphaPhi10*(rho1f - rho2f) + phiCN*rho2f;
+//    }
+//    else
+//    {
+//        if (ocCoeff > 0)
+//        {
+//            // Calculate the end-of-time-step alpha flux
+//            alphaPhi10 =
+//                (alphaPhi10 - (1.0 - cnCoeff)*alphaPhi10.oldTime())/cnCoeff;
+//        }
+//
+//        // Calculate the end-of-time-step mass flux
+//        rhoPhi = alphaPhi10*(rho1f - rho2f) + phi*rho2f;
+//    }
 
     liquidMassOld_ = liquidMass_;
     liquidMass_ = gSum((mesh.V()*rho1*alpha1)());
-    solidMass_ = gSum((mesh.V()*rho)())-liquidMass_;
+    solidMass_ = gSum((mesh.V()*rho2*alpha2)());
     dmdtTot_ = gSum((mesh.V()*SuOut)());
     deltaT_ = mesh.time().deltaTValue();
 
     Info<< "Total liquid phase weight = "
         << liquidMass_.value()
+        << endl;
+
+    Info<< "Total solid phase weight = "
+        << solidMass_.value()
         << endl;
 
     Info<< "Total dmdt = "
@@ -285,7 +325,7 @@
         fout.open(fileName, std::ios::out | std::ios::app);
         if (file.peek() == std::ifstream::traits_type::eof())
         {
-            fout << "Time[s], liquidMass[kg], solidMass[kg], dmdt[kg/s], deltaT[s], massErrRel[%]" << "\n";
+            fout << "Time[s],liquidMass[kg],solidMass[kg],dmdt[kg/s],deltaT[s],massErrRel[%]" << "\n";
         }
         fout << mesh.time().timeName() << ", "
             << liquidMass_.value() << ", "
@@ -293,6 +333,21 @@
             << dmdtTot_.value() << ", "
             << runTime.deltaT().value() << ", "
             << massErrRel.value() << "\n";
+    }
+
+    // constrain liquid VOF to [0, 1]
+    forAll(mesh.C(),i)
+    {
+        if(alpha1[i]<0.0)
+        {
+            alpha1[i]=0.0;
+            alpha2[i]=1.0-alpha1[i];
+        }
+        else if(alpha1[i]>1.0)
+        {
+            alpha1[i]=1.0;
+            alpha2[i]=1.0-alpha1[i];
+        }
     }
 
     Info<< "Phase-1 volume fraction = "

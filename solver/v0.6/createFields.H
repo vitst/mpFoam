@@ -14,6 +14,7 @@ IOdictionary inputParameters
 );
 
 dimensionedScalar molW("Mv", dimMass/dimMoles, inputParameters);
+dimensionedScalar Csat("Cactivate", dimMoles/dimVolume, inputParameters);
 bool nucleationFlag(inputParameters.lookupOrDefault<bool>("nucleation", false));
 
 Info<< "Reading field p_rgh\n" << endl;
@@ -245,7 +246,20 @@ vectorList nuSiteList;
 
 scalar timeMarker = 0.0;
 
-phaseChangeReaction phaseChange = phaseChangeReaction(inputParameters, mesh, C, alpha1);
+volScalarField Cmask
+(
+    IOobject
+    (
+        "Cmask",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+    ),
+    alpha1*0.0
+);
+
+phaseChangeReaction phaseChange = phaseChangeReaction(inputParameters, mesh, C, alpha1, Cmask);
 
 #include "createMRF.H"
 #include "createFvOptions.H"
