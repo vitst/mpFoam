@@ -1,0 +1,23 @@
+#!/bin/bash
+cd "${0%/*}" || exit                                # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
+#------------------------------------------------------------------------------
+
+# Make dummy 0 directory
+rm -rf 0
+mkdir 0
+
+runApplication blockMesh
+cp system/decomposeParDict.hierarchical system/decomposeParDict
+runApplication decomposePar
+
+cp system/decomposeParDict.ptscotch system/decomposeParDict
+runParallel snappyHexMesh -overwrite
+
+#blockMesh 2>&1 | tee log.blockmesh
+
+#decomposePar -copyUniform -cellDist 2>&1 | tee log.decompose
+
+#mpirun -n 8 snappyHexMesh -overwrite -parallel 2>&1 | tee log.SHM
+
+#reconstructParMesh -constant 2>&1 | tee log.reconstruct

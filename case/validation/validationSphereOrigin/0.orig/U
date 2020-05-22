@@ -9,49 +9,40 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "system";
-    object      controlDict;
+    class       volVectorField;
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     mpFoam;
+dimensions      [0 1 -1 0 0 0 0];
 
-startFrom       latestTime;
+internalField   uniform (0 0 0);
 
-startTime       0;
+boundaryField
+{
+    outlet   
+    {
+        type            inletOutlet;
+        inletValue      uniform (0 0 0);
+    }
+    sphere
+    {
+        type            noSlip;
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (0.0001 0 0);
+    }
+    periodicWall
+    {
+        type            symmetry;
+    }
+    "proc.*"
+    {
+        type    processor;
+    }
+}
 
-stopAt          endTime;
-
-endTime         10000;
-
-deltaT          1;
-
-writeControl    adjustableRunTime;
-
-writeInterval   100;
-
-purgeWrite      0;
-
-writeFormat     binary;
-
-writePrecision  12;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   12;
-
-runTimeModifiable yes;
-
-adjustTimeStep  yes;
-
-maxDeltaT       1;
-
-maxCo           1.;
-maxAlphaCo      1.;
-maxAlphaDdt     2.3;
-//maxDi           0.;
 
 // ************************************************************************* //

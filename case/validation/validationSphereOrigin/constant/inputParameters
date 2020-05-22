@@ -10,48 +10,22 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "system";
-    object      controlDict;
+    object      inputParameters;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-application     mpFoam;
-
-startFrom       latestTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         10000;
-
-deltaT          1;
-
-writeControl    adjustableRunTime;
-
-writeInterval   100;
-
-purgeWrite      0;
-
-writeFormat     binary;
-
-writePrecision  12;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   12;
-
-runTimeModifiable yes;
-
-adjustTimeStep  yes;
-
-maxDeltaT       1;
-
-maxCo           1.;
-maxAlphaCo      1.;
-maxAlphaDdt     2.3;
-//maxDi           0.;
+Mv                  233.38;
+pKsp                9.97;
+gamma               32.9e-3;
+Vmol                47.95e-6;
+lnA                 18.2;
+K                   1.479e-9;
+Cactivate           0.0105;
+diffInLiquid        1.4e-9;
+smoothSurface       false;
+smoothAreaDensity   20.0;
+alphaSolidMin       0.99;
+Cu                  1e30;
+nucleation          false;
+debug               false;
 
 // ************************************************************************* //

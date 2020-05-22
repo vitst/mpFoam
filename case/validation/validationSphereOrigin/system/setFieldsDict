@@ -11,47 +11,31 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      controlDict;
+    object      setFieldsDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     mpFoam;
+defaultFieldValues
+(
+    volScalarFieldValue alpha.solid     0
+    volScalarFieldValue alpha.liquid    1
+);
 
-startFrom       latestTime;
+regions
+(
+    sphereToCell
+    {
+        centre (0.00069877 0 0);
+        radius 0.0001;
+        fieldValues
+        (
+            volScalarFieldValue alpha.solid     1
+	        volScalarFieldValue alpha.liquid    0
+	        volScalarFieldValue C               0 
+            volScalarFieldValue diffCo          0
+        );
+    }
+);
 
-startTime       0;
-
-stopAt          endTime;
-
-endTime         10000;
-
-deltaT          1;
-
-writeControl    adjustableRunTime;
-
-writeInterval   100;
-
-purgeWrite      0;
-
-writeFormat     binary;
-
-writePrecision  12;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   12;
-
-runTimeModifiable yes;
-
-adjustTimeStep  yes;
-
-maxDeltaT       1;
-
-maxCo           1.;
-maxAlphaCo      1.;
-maxAlphaDdt     2.3;
-//maxDi           0.;
 
 // ************************************************************************* //

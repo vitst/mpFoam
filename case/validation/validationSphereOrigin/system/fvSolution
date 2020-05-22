@@ -41,16 +41,16 @@ solvers
     {
         solver          PCG;
         preconditioner  DIC;
-        tolerance       1e-5;
-        relTol          0;
+        tolerance       1e-4;
+        relTol          0.001;
     }
 
     "p_rgh|sPhi.*"
     {
         solver          PCG;
         preconditioner  DIC;
-        tolerance       1e-09;
-        relTol          0.02;
+        tolerance       1e-06;
+        relTol          0.01;
         //maxIter         0;
     }
 
@@ -89,7 +89,7 @@ solvers
     {
         solver          smoothSolver;
         smoother        symGaussSeidel;
-        tolerance       1e-09;
+        tolerance       1e-06;
         relTol          0;
         residualAlpha   1e-6;
     }
@@ -99,9 +99,22 @@ PIMPLE
 {
     momentumPredictor   no;
     nOuterCorrectors    1;
-    nCorrectors         3;
+    nCorrectors         1;
     nNonOrthogonalCorrectors 0;
-    frozenFlow          no;
+    //frozenFlow          no;
+    residualControl
+    {
+        U
+        {
+                tolerance  1e-6;
+                relTol      0;
+        }
+        p_rgh
+        {
+                tolerance  1e-6;
+                relTol      0.01;
+        }
+     }
 }
 
 relaxationFactors

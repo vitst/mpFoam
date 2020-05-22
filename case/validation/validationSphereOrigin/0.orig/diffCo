@@ -8,50 +8,39 @@
 FoamFile
 {
     version     2.0;
-    format      ascii;
-    class       dictionary;
-    location    "system";
-    object      controlDict;
+    format      binary;
+    class       volScalarField;
+    object      diffCo;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     mpFoam;
+dimensions      [0 2 -1 0 0 0 0];
 
-startFrom       latestTime;
+internalField   uniform 1.4e-9;
 
-startTime       0;
+boundaryField
+{
+    inlet
+    {
+        type           zeroGradient;
+    }
+    outlet
+    {
+        type           zeroGradient;
 
-stopAt          endTime;
-
-endTime         10000;
-
-deltaT          1;
-
-writeControl    adjustableRunTime;
-
-writeInterval   100;
-
-purgeWrite      0;
-
-writeFormat     binary;
-
-writePrecision  12;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   12;
-
-runTimeModifiable yes;
-
-adjustTimeStep  yes;
-
-maxDeltaT       1;
-
-maxCo           1.;
-maxAlphaCo      1.;
-maxAlphaDdt     2.3;
-//maxDi           0.;
+    }
+    sphere
+    {
+        type           zeroGradient;
+    }
+    periodicWall
+    {
+        type           symmetry;
+    }
+    "proc.*"
+    {
+        type    processor;
+    }
+}
 
 // ************************************************************************* //

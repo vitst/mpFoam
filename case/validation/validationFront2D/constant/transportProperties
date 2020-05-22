@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v1906                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|  \\    /   O peration     | Version:  v1912                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,23 +10,27 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      inputParameters;
+    location    "constant";
+    object      transportProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-Mv                  1000.0;
-pKsp                9.97;
-gamma               32.9e-3;
-Vmol                47.95e-6;
-lnA                 18.2;
-K                   0.001;
-diffInLiquid        1.0;
-Cactivate           2.0;
-diffInLiquid        1.0;
-smoothSurface       false;
-smoothAreaDensity   20.0;
-alphaSolidMin       0.99;
-Cu                  1e18;
-nucleation          false;
-debug               false;
+
+phases (liquid solid);
+
+liquid
+{
+    transportModel  Newtonian;
+    nu              1e-06;
+    rho             16;
+}
+
+solid
+{
+    transportModel  Newtonian;
+    nu              1e-06;
+    rho             16;
+}
+
+sigma            0.07;
 
 // ************************************************************************* //
