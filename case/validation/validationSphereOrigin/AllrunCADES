@@ -1,0 +1,30 @@
+#!/bin/sh
+cd ${0%/*} || exit 1                        # Run from this directory
+. $WM_PROJECT_DIR/bin/tools/RunFunctions    # Tutorial run functions
+
+# Make dummy 0 directory
+rm -rf 0
+mkdir 0
+
+# Construct mesh
+runApplication blockMesh
+cp system/decomposeParDict.hierarchical system/decomposeParDict
+runApplication decomposePar
+
+cp system/decomposeParDict.ptscotch system/decomposeParDict
+runParallel snappyHexMesh -overwrite
+
+# Backup results
+mv outputResults.csv outputResults_backup.csv
+
+# Set the initial fields
+restore0Dir -processor
+runParallel setFields
+
+# Run simulation
+runParallel $(getApplication)
+
+runApplication reconstructParMesh -constant
+runApplication reconstructPar
+
+#------------------------------------------------------------------------------
