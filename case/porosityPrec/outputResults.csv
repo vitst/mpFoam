@@ -1,0 +1,3 @@
+Time[s],liquidMass[kg],solidMass[kg],dmdt[kg/s],deltaT[s],massErrRel[%]
+1, 4.63252e-07, 1.07017e-08, 1.34298e-13, 0.113021, 348
+2, 4.63252e-07, 1.07019e-08, 1.29919e-13, 0.228571, 348
