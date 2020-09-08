@@ -4,6 +4,8 @@
         "phaseChangeReaction.C": "cpp",
         "ostream": "cpp",
         "cmath": "cpp",
-        "complex": "cpp"
+        "complex": "cpp",
+        "optional": "cpp",
+        "system_error": "cpp"
     }
 }

@@ -54,11 +54,12 @@ Foam::phaseChangeReaction::phaseChangeReaction
     volScalarField& Cmask
 )
 :
-    Cu_(dict.get<scalar>("Cu")),
-    pKsp_(dict.get<scalar>("pKsp")),
-    lnA_(dict.get<scalar>("lnA")),
-    gamma_(dict.get<scalar>("gamma")),
-    Vmol_(dict.get<scalar>("Vmol")),
+    Cu_(dict.lookupOrDefault<scalar>("Cu", 1e15)),
+    pKsp_(dict.lookupOrDefault<scalar>("pKsp", 1.0)),
+    lnA_(dict.lookupOrDefault<scalar>("lnA", 1.0)),
+    gamma_(dict.lookupOrDefault<scalar>("gamma", 1.0)),
+    Vmol_(dict.lookupOrDefault<scalar>("Vmol", 1.0)),
+    reacModel_(dict.lookupOrDefault<word>("reactionModel", "linear")),
     K_("K", dimMoles/dimArea/dimTime, dict),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
     Mv_("Mv", dimMass/dimMoles, dict),
@@ -68,9 +69,12 @@ Foam::phaseChangeReaction::phaseChangeReaction
     alphaRestMax_(dict.lookupOrDefault<scalar>("alphaRestMax", 0.01)),
     smoothSurface_(dict.lookupOrDefault<bool>("smoothSurface", false)),
     smoothAreaDensity_(dict.lookupOrDefault<scalar>("smoothAreaDensity", 1.0)),
+    gradLim_(dict.lookupOrDefault<scalar>("gradientLimit", 1e6)),
     alpha_(alpha),
     Cmask_(Cmask),
     debug_(dict.lookupOrDefault<bool>("debug", false)),
+    nucleationFlag_(dict.lookupOrDefault<bool>("nucleation", false)),
+    dirGrowthFlag_(dict.lookupOrDefault<bool>("dirGrowth", false)),
     C_(C),
     mesh_(mesh)
 {
@@ -114,72 +118,128 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
         "areaDensityGrad",
         2*mag(gradFrom)
     );
-    //areaDensityGrad = areaDensityGradTmp;
     Info<< "areaDensityGrad min/max : "<<min(areaDensityGrad).value()<<", "<< max(areaDensityGrad).value()<<endl;
     
     const volScalarField gradAlphaf(gradFrom & gradTo);
 
-    //volScalarField Cmask("Cmask", from*0.0);
-    //Cmask.correctBoundaryConditions();
-    //Info<< "calculate Cmask..." <<endl;
+    const vector xDir(1, 0, 0);
+    const vector yDir(0, 1, 0);
+    const vector zDir(0, 0, 1);
+    const vector dir210(0.447, 0.894, 0);
+    const vector dir210Neg(0.447, -0.894, 0);
 
-    //// mark cells that is next to the solid phase cell
-    //// within same processor
-    //forAll(Cmask, celli)
-    //{
-    //    if (gradAlphaf[celli] < 0)
-    //    {
-    //        if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
-    //        {
-    //            {
-    //                scalar alphaRes = 1.0 - from[celli] - to[celli];
-    //                if (alphaRes < alphaRestMax_)
-    //                {
-    //                    Cmask[celli] = 1.0;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    //- check nearby cell within same processor
-    //    bool flag = false;
-    //    forAll(mesh_.cellCells()[celli],cellj)
-    //    {
-    
-    //        if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
-    //        {
-    //            flag = true;
-    //        }
-    //    }
-    //    if (flag)
-    //    {
-    //        Cmask[celli] = 1.0;
-    //    }
-    //    else
-    //    {
-    //        Cmask[celli] = 0.0;
-    //    }
-    //}
+    dimensionedScalar VSUnit
+    (
+        "VSUnit",
+        dimensionSet(0,-1,0,0,0,0,0),
+        VSMALL
+    );
 
-    ////- check mesh boundaries of the processor
-    //forAll(mesh_.boundaryMesh(), patchI)
-    //{
-    //    const fvPatchScalarField& pf = to.boundaryField()[patchI];
-    //    const labelList& faceCells = pf.patch().faceCells();
+    //- construct directional gradient to track interface norm
+    const volScalarField xDirGradSolid
+    (
+        "xDirGradSolid",
+        gradTo & xDir
+    );
 
-    //    //- Coupled boundaries (processor, cylic, etc)
-    //    if(pf.coupled())
-    //    {
-    //        scalarField neighbors = pf.patchNeighbourField();
+    const volScalarField yDirGradSolid
+    (
+        "yDirGradSolid",
+        gradTo & yDir
+    );
 
-    //        forAll(faceCells, faceI)
-    //        {
-    //            if (neighbors[faceI] > alphaSolidMin_)
-    //            {
-    //                Cmask[faceCells[faceI]] = 1.0;
-    //            }
-    //        }
-    //    }
-    //} 
+    const volScalarField zDirGradSolid
+    (
+        "zDirGradSolid",
+        gradTo & zDir
+    );
+
+    const volScalarField dir210GradSolid
+    (
+        "dir210GradSolid",
+        gradTo & dir210
+    );
+
+    //- Update the reaction constant field basing on surface norm
+    tmp<volScalarField> tkConst
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "tkConst",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimMoles/dimArea/dimTime, Zero)
+        )
+    );
+    volScalarField& kConst = tkConst.ref();
+
+    if(dirGrowthFlag_)
+    {
+        forAll(kConst, cellI)
+        {
+            //- Calculate similarity of surface norm and directional vectors
+            scalar tCosX = (gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL);
+            scalar tCosY = (gradTo[cellI] & yDir)/(mag(gradTo[cellI])+SMALL);
+            scalar tCosZ = (gradTo[cellI] & zDir)/(mag(gradTo[cellI])+SMALL);
+            scalar tCos210 = (gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL);
+            scalar tCos210Neg = (gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL);
+
+            scalar tmpDir = mag(tCosX);
+            kConst[cellI] = 1.602e-7*Cmask_[cellI]*8.7;
+
+            if(tmpDir<mag(tCosY))
+            {
+                kConst[cellI] = 1.71e-6*8.7;
+                tmpDir = mag(tCosY);
+            }
+
+            if(tmpDir<mag(tCosZ))
+            {
+                kConst[cellI] = 3.2e-7*8.7;
+                tmpDir = mag(tCosZ);
+            }
+
+            if(tmpDir<mag(tCos210))
+            {
+                kConst[cellI] = 4.81e-7*8.7;
+                tmpDir = mag(tCos210);
+            }
+
+            if(tmpDir<mag(tCos210Neg))
+            {
+                kConst[cellI] = 4.81e-7*8.7;
+                tmpDir = mag(tCos210Neg);
+            }
+
+            //kConst[cellI] = 1.0 * tCosX + 2.0 * tCosY + 3.0 * tCosZ;
+        }
+    }
+    else
+    {
+        forAll(kConst, cellI)
+        {
+            kConst[cellI] = K_.value();
+        }
+    }
+
+    //- Define units for kinetic equation to suit input format
+    FixedList<scalar,7> dims;
+    if(reacModel_ == "linear")
+    {
+        dims = {1, -3, 0, 0, 0, 0, 0};
+    }
+    else if(reacModel_ == "SI")
+    {
+        dims = {1, 0, 0, 0, -1, 0, 0};
+    }
+
+    dimensionSet unit(dims);
 
     tmp<volScalarField> tRhom
     (
@@ -194,7 +254,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
                 IOobject::NO_WRITE
             ),
             mesh_,
-            dimensionedScalar(dimMass/dimMoles, Zero)
+            dimensionedScalar(unit, Zero)
         )
     );
     volScalarField& rhom = tRhom.ref();
@@ -227,16 +287,32 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 
     if (sign(K_.value()) > 0)
     {
-        //- convert mol/m3 to kg/m3 for OpenFOAM
-        rhom =
-            (pow(C_,2.0)/pow(Cactivate_,2.0))*Mv_;
+        if(reacModel_=="linear")
+        {
+            //- convert mol/m3 to kg/m3 for OpenFOAM
+            rhom =
+                (C_-Cactivate_)*Mv_;
 
-        tDelta = max
-        (
-            pos(C_*Cmask_ - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
-            dimensionedScalar("C0", dimless, Zero)
-        );
-            Info<<"rhom min/max: " << min(rhom).value() << ", "<< max(rhom).value() << endl;
+            tDelta = max
+            (
+                pos(C_*Cmask_ - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
+                dimensionedScalar("C0", dimless, Zero)
+            );
+            Info<<"rhom min/max: " << min(rhom).value() << ", "<< max(rhom).value() << endl; 
+        }
+        else if(reacModel_=="SI")
+        {
+            //- convert mol/m3 to kg/m3 for OpenFOAM
+            rhom =
+                (pow(C_,2.0)/pow(Cactivate_,2.0)-1.0)*Mv_;
+
+            tDelta = max
+            (
+                pos(C_*Cmask_ - Cactivate_),//dimensionedScalar("C1", dimMoles/dimVolume, 1.0),
+                dimensionedScalar("C0", dimless, Zero)
+            );
+            Info<<"rhom min/max: " << min(rhom).value() << ", "<< max(rhom).value() << endl; 
+        }
     }
     else
     {
@@ -247,17 +323,23 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     volScalarField massFluxPrec
     (
         "massFluxPrec",
-        K_
+        kConst//K_
         * rhom
         * tDelta
         * pos(from-0.01)
     );
+
 
     if (mesh_.time().outputTime())
     {
         areaDensityGrad.write();
         //Cmask.write();
         to.write();
+        xDirGradSolid.write();
+        yDirGradSolid.write();
+        zDirGradSolid.write();
+        dir210GradSolid.write();
+        kConst.write();
 //            volScalarField mKGasDot
 //            (
 //                "mKGasDot",
@@ -294,7 +376,15 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 //    }
     dimensionedScalar totReactionRate_(0.0);
 
-    totReactionRate_ = gSum((mesh_.V()*massFluxPrec*areaDensityGrad)());
+    if(reacModel_=="linear")
+    {
+        totReactionRate_ = gSum((mesh_.V()*massFluxPrec*areaDensityGrad*unitConv)());
+    }
+    else if(reacModel_=="SI")
+    {
+        totReactionRate_ = gSum((mesh_.V()*massFluxPrec*areaDensityGrad)());
+    }
+
 
     Info<< "precipitate return: " << min(massFluxPrec).value() << ", "<< max(massFluxPrec).value() << endl;
     Info<< "Total reaction rate: " << totReactionRate_.value() << endl;
@@ -307,7 +397,14 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     else
     {
         Info<< "Gradient surface areaDensity method used!" << endl;
-        return massFluxPrec * areaDensityGrad;            
+        if(reacModel_=="linear")
+        {
+            return massFluxPrec * areaDensityGrad * unitConv;
+        }
+        else if(reacModel_=="SI")
+        {
+            return massFluxPrec * areaDensityGrad;
+        }
     }
 }
 
@@ -474,7 +571,7 @@ void Foam::phaseChangeReaction::updateCmask()
         {
             if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
             {
-                if(mag(gradFrom[celli])>200000)
+                if(mag(gradFrom[celli])>gradLim_)
                 {
                     Cmask_[celli] = 1.0;
                 }
@@ -490,6 +587,15 @@ void Foam::phaseChangeReaction::updateCmask()
                 flag = true;
             }
         }
+
+        //- nucleation site enable growth
+        // if(nucleationFlag_)
+        // {
+        //     if(nuSite[celli]==1.0)
+        //     {
+        //         Cmask_[celli] = 1.0;
+        //     }
+        // }
         //if (flag)
         //{
         //    Cmask_[celli] = 1.0;
@@ -499,7 +605,7 @@ void Foam::phaseChangeReaction::updateCmask()
     //- check mesh boundaries of the processor
     forAll(mesh_.boundaryMesh(), patchI)
     {
-        const fvPatchScalarField& pf = to.boundaryField()[patchI];
+        const fvPatchScalarField& pf = from.boundaryField()[patchI];
         const labelList& faceCells = pf.patch().faceCells();
 
         //- Coupled boundaries (processor, cylic, etc)
@@ -509,24 +615,29 @@ void Foam::phaseChangeReaction::updateCmask()
 
             forAll(faceCells, faceI)
             {
-                if (neighbors[faceI] > alphaSolidMin_)
+                if (neighbors[faceI] <= (1.0-alphaSolidMin_))
                 {
                     Cmask_[faceCells[faceI]] = 1.0;
                 }
             }
         }
     } 
+
+    Cmask_.correctBoundaryConditions();
 }
 
 void Foam::phaseChangeReaction::nuSiteCal
 (
     volScalarField& nuSite,
     volScalarField& cryDomain,
-    vectorList& nuSiteList
+    volScalarField& nuRateOut,
+    vectorList& nuSiteList,
+    dimensionedScalar& nuTotal_
 )
 {
     //Calculate the possibilities for nucleation
     tmp<volScalarField> nuRate = nuRateCal();
+    nuRateOut = nuRate.ref();
     Info<< "Max/Min nucleation rate(n/m2/s): " << max(nuRate.ref()).value() << ", " << min(nuRate.ref()).value()<< endl;
 
     //Loop through wall boundary patches to estimate nucleation
@@ -549,7 +660,7 @@ void Foam::phaseChangeReaction::nuSiteCal
     }
 
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd());
+    std::default_random_engine generator(rd());
 
     forAll(wallList, i)
     {
@@ -564,25 +675,38 @@ void Foam::phaseChangeReaction::nuSiteCal
             }
         }
 
-        std::uniform_real_distribution<> dis(0.0, 1.0);
+        std::random_device rd;  //Will be used to obtain a seed for the random number engine
+        std::default_random_engine generator(rd());
+        scalar upperLim = 1.0/faceArea;
+        std::uniform_int_distribution<long long unsigned> dis(1, static_cast<long long unsigned>(upperLim));
+        scalar randNum = dis(generator);
 
         if(debug_)
         {
             Info<< "Max faceArea: " << faceArea << endl;
-            Info<< "Random integer generated: " << poss << endl;
+            //cout<< "Total cell counts per unit area: " << upper << endl;
+            Info<< "Random integer generated: " << randNum << endl;
             Info<< "Nucleation rate: " << nuRate.ref()[wallList[i]] << endl;
             Info<< "Computational time: " << mesh_.time().value() << endl;
         }
 
-        if((nuRate.ref()[wallList[i]]/1e12*1e2)>(dis(gen)*faceArea*1e12))
+        if((nuRate.ref()[wallList[i]])>randNum)
         {
             nuSite[wallList[i]] = 1.0;
+            Cmask_[wallList[i]] = 1.0;
+            if(alpha_[wallList[i]] > 0.5)
+            {
+                nuTotal_.value() += 1.0;
+                Info<< "New nucleation site found: " << nuRate.ref()[wallList[i]] << " > " << randNum << endl;
+            }
         }
         // mark cells for check, remove in running code
         // nuSite[wallList[i]] = 1.0;
     }
+    Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
 
-    cryCons(nuSite, cryDomain, nuSiteList);
+    // constrain crystal shape domain
+    // cryCons(nuSite, cryDomain, nuSiteList);
 }
 
 Foam::tmp<Foam::volScalarField> 
@@ -613,7 +737,7 @@ Foam::phaseChangeReaction::CtoSI
     // mol/m3 to SI
     forAll(mesh_.C(), cellI)
     {
-        SItmpRef[cellI] = max(0.001, log10((pow(C_[cellI],2.0)+VSMALL)/Ksp));
+        SItmpRef[cellI] = max(0.001, log10((pow(C_[cellI]/1000,2.0)+VSMALL)/Ksp));
     };
 
     return SItmp;
@@ -636,7 +760,7 @@ Foam::phaseChangeReaction::nuRateCal
                 IOobject::NO_WRITE
             ),
             mesh_,
-            dimensionedScalar(dimArea/dimTime, Zero)
+            dimensionedScalar(dimless/dimArea/dimTime, Zero)
         )
     );
     volScalarField& nuRateRef = nuRate.ref();

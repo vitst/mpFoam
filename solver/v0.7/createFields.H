@@ -98,37 +98,49 @@ volScalarField diffCo
 );
 
 
-if(nucleationFlag)
-{
-    Info<< "Reading field for nucleation\n" << endl;
-    volScalarField nuSite
+Info<< "Reading field for nucleation\n" << endl;
+volScalarField nuSite
+(
+    IOobject
     (
-        IOobject
-        (
-            "nuSite",
-            runTime.timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh
-    );
-
-    Info<< "Reading field for nucleation\n" << endl;
-    volScalarField cryDomain
-    (
-        IOobject
-        (
-            "cryDomain",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
+        "nuSite",
+        runTime.timeName(),
         mesh,
-        dimensionedScalar(dimless, Zero)
-    );
-}
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimless, Zero)
+);
+
+volScalarField nuRate
+(
+    IOobject
+    (
+        "nuRate",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimless/dimArea/dimTime, Zero)
+);
+
+Info<< "Reading field for nucleation\n" << endl;
+volScalarField cryDomain
+(
+    IOobject
+    (
+        "cryDomain",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimless, Zero)
+);
 
 
 Info<< "Reading transportProperties\n" << endl;
@@ -243,6 +255,8 @@ dimensionedScalar dmdtTot_(0.0);
 dimensionedScalar deltaT_(0.0);
 
 vectorList nuSiteList;
+dimensionedScalar nuCount_(0.0);
+dimensionedScalar nuTotal_(0.0);
 
 scalar timeMarker = 0.0;
 
@@ -266,6 +280,9 @@ bool ionEffect = inputParameters.lookupOrDefault<bool>("ionEffect", false);
 scalar ionEffectA = inputParameters.lookupOrDefault<scalar>("ionEffectA", 0.0);
 scalar ionEffectB = inputParameters.lookupOrDefault<scalar>("ionEffectB", 0.0);
 scalar conSat = inputParameters.lookupOrDefault<scalar>("Cactivate", 1.0);
+
+//- initial nucleation vof
+scalar nuIntVof = inputParameters.lookupOrDefault<scalar>("nucleationVof", 1e-6);
 
 #include "createMRF.H"
 #include "createFvOptions.H"
