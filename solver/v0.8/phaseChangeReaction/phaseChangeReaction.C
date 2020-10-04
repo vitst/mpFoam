@@ -139,25 +139,31 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     const volScalarField xDirGradSolid
     (
         "xDirGradSolid",
-        gradTo & xDir
+        (gradTo & xDir) 
     );
 
     const volScalarField yDirGradSolid
     (
         "yDirGradSolid",
-        gradTo & yDir
+        (gradTo & yDir) 
     );
 
     const volScalarField zDirGradSolid
     (
         "zDirGradSolid",
-        gradTo & zDir
+        (gradTo & zDir) 
     );
 
     const volScalarField dir210GradSolid
     (
         "dir210GradSolid",
-        gradTo & dir210
+        (gradTo & dir210) 
+    );
+
+    const volScalarField dir210NegGradSolid
+    (
+        "dir210NegGradSolid",
+        (gradTo & dir210Neg) 
     );
 
     //- Update the reaction constant field basing on surface norm
@@ -184,36 +190,36 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
         forAll(kConst, cellI)
         {
             //- Calculate similarity of surface norm and directional vectors
-            scalar tCosX = (gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL);
+            scalar tCosX = ((gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL))*0.6;
             scalar tCosY = (gradTo[cellI] & yDir)/(mag(gradTo[cellI])+SMALL);
             scalar tCosZ = (gradTo[cellI] & zDir)/(mag(gradTo[cellI])+SMALL);
-            scalar tCos210 = (gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL);
-            scalar tCos210Neg = (gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL);
+            scalar tCos210 = ((gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL));
+            scalar tCos210Neg = ((gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL));
 
             scalar tmpDir = mag(tCosX);
-            kConst[cellI] = 1.602e-7*Cmask_[cellI]*8.7;
+            kConst[cellI] = 1.394e-7*Cmask_[cellI];
 
             if(tmpDir<mag(tCosY))
             {
-                kConst[cellI] = 1.71e-6*8.7;
+                kConst[cellI] = 9.3612e-06;
                 tmpDir = mag(tCosY);
             }
 
             if(tmpDir<mag(tCosZ))
             {
-                kConst[cellI] = 3.2e-7*8.7;
+                kConst[cellI] = 2.784e-06;
                 tmpDir = mag(tCosZ);
             }
 
             if(tmpDir<mag(tCos210))
             {
-                kConst[cellI] = 4.81e-7*8.7;
+                kConst[cellI] = 4.1847e-06;
                 tmpDir = mag(tCos210);
             }
 
             if(tmpDir<mag(tCos210Neg))
             {
-                kConst[cellI] = 4.81e-7*8.7;
+                kConst[cellI] = 4.1847e-06;
                 tmpDir = mag(tCos210Neg);
             }
 
@@ -339,6 +345,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
         yDirGradSolid.write();
         zDirGradSolid.write();
         dir210GradSolid.write();
+        dir210NegGradSolid.write();
         kConst.write();
 //            volScalarField mKGasDot
 //            (

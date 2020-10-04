@@ -195,7 +195,7 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 
             if(tmpDir<mag(tCosY))
             {
-                kConst[cellI] = 1.71e-6*8.7;
+                kConst[cellI] = 1.076e-6*8.7;
                 tmpDir = mag(tCosY);
             }
 
