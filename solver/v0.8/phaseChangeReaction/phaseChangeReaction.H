@@ -60,6 +60,18 @@ protected:
 
     // Private data
 
+        //- Directional growth option
+        bool dirGrowthFlag_;
+
+        //- Directional growth number
+        const scalar dirGrowthNum_;
+
+        //- Directional growth norms
+        const List<vector> dirGrowthNorm_;
+
+        //- Directional growth similarity prefactor
+        const List<scalar> dirFactor_;
+
         //- Constant interfacial porosity coefficient
         const scalar Cu_;
 
@@ -80,6 +92,9 @@ protected:
 
         //- Precipitation coefficient
         dimensionedScalar K_;
+
+        //- Directional precipitation coefficient
+        const List<scalar> KList_;
 
         //- Activation temperature or concentration
         const dimensionedScalar Cactivate_;
@@ -119,9 +134,6 @@ protected:
 
         //- Nucleation site option
         bool nucleationFlag_;
-
-        //- Directional growth option
-        bool dirGrowthFlag_;
 
         //- Concentration field
         const volScalarField& C_;

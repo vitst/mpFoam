@@ -54,6 +54,10 @@ Foam::phaseChangeReaction::phaseChangeReaction
     volScalarField& Cmask
 )
 :
+    dirGrowthFlag_(dict.lookupOrDefault<bool>("dirGrowth", false)),
+    dirGrowthNum_(dict.lookupOrDefault<scalar>("dirGrowthNum", 1.0)),
+    dirGrowthNorm_(dict.lookupOrDefault<List<vector>>("dirGrowthNorm", {vector::zero})),
+    dirFactor_(dict.lookupOrDefault<List<scalar>>("dirFactor", {1.0})),
     Cu_(dict.lookupOrDefault<scalar>("Cu", 1e15)),
     pKsp_(dict.lookupOrDefault<scalar>("pKsp", 1.0)),
     lnA_(dict.lookupOrDefault<scalar>("lnA", 1.0)),
@@ -61,6 +65,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     Vmol_(dict.lookupOrDefault<scalar>("Vmol", 1.0)),
     reacModel_(dict.lookupOrDefault<word>("reactionModel", "linear")),
     K_("K", dimMoles/dimArea/dimTime, dict),
+    KList_(dict.lookupOrDefault<List<scalar>>("KList", {1.0})),
     Cactivate_("Cactivate", dimMoles/dimVolume, dict),
     Mv_("Mv", dimMass/dimMoles, dict),
     alphaMax_(dict.lookupOrDefault<scalar>("alphaMax", 1.1)),
@@ -74,7 +79,6 @@ Foam::phaseChangeReaction::phaseChangeReaction
     Cmask_(Cmask),
     debug_(dict.lookupOrDefault<bool>("debug", false)),
     nucleationFlag_(dict.lookupOrDefault<bool>("nucleation", false)),
-    dirGrowthFlag_(dict.lookupOrDefault<bool>("dirGrowth", false)),
     C_(C),
     mesh_(mesh)
 {
@@ -190,38 +194,50 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
         forAll(kConst, cellI)
         {
             //- Calculate similarity of surface norm and directional vectors
-            scalar tCosX = ((gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL))*0.6;
-            scalar tCosY = (gradTo[cellI] & yDir)/(mag(gradTo[cellI])+SMALL);
-            scalar tCosZ = (gradTo[cellI] & zDir)/(mag(gradTo[cellI])+SMALL);
-            scalar tCos210 = ((gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL));
-            scalar tCos210Neg = ((gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL));
-
-            scalar tmpDir = mag(tCosX);
-            kConst[cellI] = 1.394e-7*Cmask_[cellI];
-
-            if(tmpDir<mag(tCosY))
+            scalar tmpDir = 0.0;
+            for (size_t i = 0; i < dirGrowthNum_; i++)
             {
-                kConst[cellI] = 9.3612e-06;
-                tmpDir = mag(tCosY);
+                scalar tCosTmp = ((gradTo[cellI] & dirGrowthNorm_[i])/(mag(gradTo[cellI])+SMALL))*dirFactor_[i];
+                if (tmpDir<mag(tCosTmp))
+                {
+                    kConst[cellI] = KList_[i]*Cmask_[cellI];
+                    tmpDir = mag(tCosTmp);
+                }
             }
+            
+            //- Calculate similarity of surface norm and directional vectors
+            //scalar tCosX = ((gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL))*0.6;
+            //scalar tCosY = (gradTo[cellI] & yDir)/(mag(gradTo[cellI])+SMALL);
+            //scalar tCosZ = (gradTo[cellI] & zDir)/(mag(gradTo[cellI])+SMALL);
+            //scalar tCos210 = ((gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL));
+            //scalar tCos210Neg = ((gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL));
 
-            if(tmpDir<mag(tCosZ))
-            {
-                kConst[cellI] = 2.784e-06;
-                tmpDir = mag(tCosZ);
-            }
+            //scalar tmpDir = mag(tCosX);
+            //kConst[cellI] = 1.394e-6*Cmask_[cellI];
 
-            if(tmpDir<mag(tCos210))
-            {
-                kConst[cellI] = 4.1847e-06;
-                tmpDir = mag(tCos210);
-            }
+            //if(tmpDir<mag(tCosY))
+            //{
+            //    kConst[cellI] = 9.3612e-06;
+            //    tmpDir = mag(tCosY);
+            //}
 
-            if(tmpDir<mag(tCos210Neg))
-            {
-                kConst[cellI] = 4.1847e-06;
-                tmpDir = mag(tCos210Neg);
-            }
+            //if(tmpDir<mag(tCosZ))
+            //{
+            //    kConst[cellI] = 2.784e-06;
+            //    tmpDir = mag(tCosZ);
+            //}
+
+            //if(tmpDir<mag(tCos210))
+            //{
+            //    kConst[cellI] = 4.1847e-06;
+            //    tmpDir = mag(tCos210);
+            //}
+
+            //if(tmpDir<mag(tCos210Neg))
+            //{
+            //    kConst[cellI] = 4.1847e-06;
+            //    tmpDir = mag(tCos210Neg);
+            //}
 
             //kConst[cellI] = 1.0 * tCosX + 2.0 * tCosY + 3.0 * tCosZ;
         }
