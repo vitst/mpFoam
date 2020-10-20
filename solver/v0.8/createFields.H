@@ -127,22 +127,6 @@ volScalarField nuRate
     dimensionedScalar(dimless/dimArea/dimTime, Zero)
 );
 
-Info<< "Reading field for nucleation\n" << endl;
-volScalarField cryDomain
-(
-    IOobject
-    (
-        "cryDomain",
-        runTime.timeName(),
-        mesh,
-        IOobject::NO_READ,
-        IOobject::AUTO_WRITE
-    ),
-    mesh,
-    dimensionedScalar(dimless, Zero)
-);
-
-
 Info<< "Reading transportProperties\n" << endl;
 immiscibleIncompressibleTwoPhaseMixture mixture(U, phi);
 

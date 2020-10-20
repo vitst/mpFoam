@@ -181,14 +181,13 @@ public:
     virtual tmp<fvScalarMatrix> preRect(const volScalarField& C, volScalarField& SuOutput);
 
     //- Return nucleation site basing on concentration field
-    virtual void nuSiteCal(volScalarField& nuSitei, volScalarField& cryCons, volScalarField& nuRateOut, vectorList& nuSiteList, dimensionedScalar& nuTotal_);
+    virtual void nuSiteCal(volScalarField& nuSitei, volScalarField& nuRateOut, vectorList& nuSiteList, dimensionedScalar& nuTotal_);
     virtual tmp<volScalarField> CtoSI();
     virtual tmp<volScalarField> nuRateCal();
     //- virtual tmp<fvScalarMatrix> nuSourceC();
 
     //- Geometry constrain for crystal growth
     virtual vectorList extractNuSite(const volScalarField& nuSite, vectorList& nuSiteList);
-    virtual void cryCons(const volScalarField& nuSite, volScalarField& cryDomain, vectorList& nuSiteList);
     
 };
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

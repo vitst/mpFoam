@@ -216,42 +216,6 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
                     tmpDir = mag(tCosTmp);
                 }
             }
-            
-            //- Calculate similarity of surface norm and directional vectors
-            //scalar tCosX = ((gradTo[cellI] & xDir)/(mag(gradTo[cellI])+SMALL))*0.6;
-            //scalar tCosY = (gradTo[cellI] & yDir)/(mag(gradTo[cellI])+SMALL);
-            //scalar tCosZ = (gradTo[cellI] & zDir)/(mag(gradTo[cellI])+SMALL);
-            //scalar tCos210 = ((gradTo[cellI] & dir210)/(mag(gradTo[cellI])+SMALL));
-            //scalar tCos210Neg = ((gradTo[cellI] & dir210Neg)/(mag(gradTo[cellI])+SMALL));
-
-            //scalar tmpDir = mag(tCosX);
-            //kConst[cellI] = 1.394e-6*Cmask_[cellI];
-
-            //if(tmpDir<mag(tCosY))
-            //{
-            //    kConst[cellI] = 9.3612e-06;
-            //    tmpDir = mag(tCosY);
-            //}
-
-            //if(tmpDir<mag(tCosZ))
-            //{
-            //    kConst[cellI] = 2.784e-06;
-            //    tmpDir = mag(tCosZ);
-            //}
-
-            //if(tmpDir<mag(tCos210))
-            //{
-            //    kConst[cellI] = 4.1847e-06;
-            //    tmpDir = mag(tCos210);
-            //}
-
-            //if(tmpDir<mag(tCos210Neg))
-            //{
-            //    kConst[cellI] = 4.1847e-06;
-            //    tmpDir = mag(tCos210Neg);
-            //}
-
-            //kConst[cellI] = 1.0 * tCosX + 2.0 * tCosY + 3.0 * tCosZ;
         }
     }
     else
@@ -378,32 +342,6 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
 //            mKGasDot.write();
     }
 
-
-    //- Constrain the reaction rate to prevent negative concentration
-//    if(smoothSurface_)
-//    {
-//        forAll(mesh_.C(), cellI)
-//        {
-//            if(massFluxPrec[cellI]*areaDensitySmooth[cellI]*mesh_.time().deltaTValue()
-//                > mag(C_[cellI]-Cactivate_.value())*Mv_.value())
-//                {
-//                    massFluxPrec[cellI] = mag(C_[cellI]-Cactivate_.value())*Mv_.value()
-//                                        / (mesh_.time().deltaTValue()*areaDensitySmooth[cellI]+VSMALL);
-//                }
-//        }   
-//    }
-//    else
-//    {
-//        forAll(mesh_.C(), cellI)
-//        {
-//            if(massFluxPrec[cellI]*areaDensityGrad[cellI]*mesh_.time().deltaTValue()
-//                > mag(C_[cellI]-Cactivate_.value())*Mv_.value())
-//                {
-//                    massFluxPrec[cellI] = mag(C_[cellI]-Cactivate_.value())*Mv_.value()
-//                                        / (mesh_.time().deltaTValue()*areaDensityGrad[cellI]+VSMALL);
-//                }
-//        }
-//    }
     dimensionedScalar totReactionRate_(0.0);
 
     if(reacModel_=="linear")
@@ -496,61 +434,7 @@ void Foam::phaseChangeReaction::addInterfacePorosity(fvVectorMatrix& UEqn)
     scalarField& Udiag = UEqn.diag();
 
     //- Voller Prakash interfacial porosity model
-
     const volScalarField& liquidAlpha = alpha_;
-    ////- Readjust in next version for better coding
-    //const volScalarField& from = alpha_;
-
-    //const volScalarField to
-    //(
-    //    "to",
-    //    1.0-alpha_
-    //);
-
-    //const volVectorField gradFrom(fvc::grad(from));
-    //const volVectorField gradTo(fvc::grad(to));
-    //const volScalarField gradAlphaf(gradFrom & gradTo);
-
-    //volScalarField Cmask("Cmask", liquidAlpha*0.0);
-    //Cmask.correctBoundaryConditions();
-    //Info<< "calculate Cmask..." <<endl;
-
-    //// mark cells that is next to the solid phase cell
-    //// within same processor
-    //forAll(Cmask, celli)
-    //{
-    //    if (gradAlphaf[celli] < 0)
-    //    {
-    //        if (from[celli] > alphaMin_ && from[celli] < alphaMax_)
-    //        {
-    //            {
-    //                scalar alphaRes = 1.0 - from[celli] - to[celli];
-    //                if (alphaRes < alphaRestMax_)
-    //                {
-    //                    Cmask[celli] = 1.0;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    //- check nearby cell within same processor
-    //    bool flag = false;
-    //    forAll(mesh_.cellCells()[celli],cellj)
-    //    {
-    
-    //        if (to[mesh_.cellCells()[celli][cellj]] > alphaSolidMin_)
-    //        {
-    //            flag = true;
-    //        }
-    //    }
-    //    if (flag)
-    //    {
-    //        Cmask[celli] = 1.0;
-    //    }
-    //    else
-    //    {
-    //        Cmask[celli] = 0.0;
-    //    }
-    //}
 
     tmp<volScalarField> STerm 
     (
@@ -665,7 +549,6 @@ void Foam::phaseChangeReaction::updateCmask()
 void Foam::phaseChangeReaction::nuSiteCal
 (
     volScalarField& nuSite,
-    volScalarField& cryDomain,
     volScalarField& nuRateOut,
     vectorList& nuSiteList,
     dimensionedScalar& nuTotal_
@@ -741,8 +624,6 @@ void Foam::phaseChangeReaction::nuSiteCal
     }
     Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
 
-    // constrain crystal shape domain
-    // cryCons(nuSite, cryDomain, nuSiteList);
 }
 
 Foam::tmp<Foam::volScalarField> 
@@ -837,65 +718,6 @@ Foam::phaseChangeReaction::extractNuSite
     }
 
     return nuSiteList;
-}
-
-void Foam::phaseChangeReaction::cryCons
-(
-    const volScalarField& nuSite,
-    volScalarField& cryDomain,
-    vectorList& nuSiteList
-)
-{
-    tmp<volScalarField> tmpCryDomain 
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "tmpCryDomain",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh_,
-            dimensionedScalar(dimless, Zero)
-        )
-    );
-    volScalarField& tmpCryDomainRef = tmpCryDomain.ref();
-
-    vectorList nuSiteListTmp = extractNuSite(nuSite, nuSiteList);
-    Info<< "Total amount of nucleation sites: " << nuSiteListTmp.size() << endl;
-
-    // calculate the volume occupied by the constrained crystal domain from cell center
-    forAll(mesh_.C(), cellI)
-    {
-        scalar xCell = mesh_.C()[cellI].component(0);
-        scalar yCell = mesh_.C()[cellI].component(1);
-        scalar zCell = mesh_.C()[cellI].component(2);
-        for(int nuI=0; nuI<nuSiteListTmp.size(); nuI++)
-        {
-            if(cellI==0)
-            {
-                Info<< "operation #: " << nuI << endl;
-            }
-            scalar xCoorMin = nuSiteListTmp[nuI][0]-4.1e-6;
-            scalar xCoorMax = nuSiteListTmp[nuI][0]+4.1e-6;
-            scalar yCoorMin = nuSiteListTmp[nuI][1]-4.1e-6;
-            scalar yCoorMax = nuSiteListTmp[nuI][1]+4.1e-6;
-            scalar zCoorMin = nuSiteListTmp[nuI][2]-2.1e-6;
-            scalar zCoorMax = nuSiteListTmp[nuI][2]+2.1e-6;
-            if((((((xCoorMin<=xCell) && (xCell<=xCoorMax)) && (yCoorMin<=yCell)) && (yCell<=yCoorMax)) && (zCoorMin<=zCell)) && (zCell<=zCoorMax))
-            {
-                tmpCryDomainRef[cellI] = 1.0;
-            }
-        }
-    }
-
-    forAll(mesh_.C(), cellI)
-    {
-        cryDomain[cellI] = tmpCryDomainRef[cellI];
-    }
 }
 
 Foam::phaseChangeReaction::~phaseChangeReaction(){};

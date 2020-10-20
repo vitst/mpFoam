@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
         {
             if((floor(runTime.value())-floor(timeMarker))>=1.0)
             {
-                phaseChange.nuSiteCal(nuSite, cryDomain, nuRate, nuSiteList, nuTotal_);
+                phaseChange.nuSiteCal(nuSite, nuRate, nuSiteList, nuTotal_);
             }
             if(Pstream::master() && runTime.outputTime())
             {
