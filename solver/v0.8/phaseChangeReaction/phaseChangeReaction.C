@@ -74,7 +74,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     alphaRestMax_(dict.lookupOrDefault<scalar>("alphaRestMax", 0.01)),
     smoothSurface_(dict.lookupOrDefault<bool>("smoothSurface", false)),
     smoothAreaDensity_(dict.lookupOrDefault<scalar>("smoothAreaDensity", 1.0)),
-    gradLim_(dict.lookupOrDefault<scalar>("gradientLimit", 1e6)),
+    gradLim_(dict.lookupOrDefault<scalar>("gradientLimit", 1e20)),
     alpha_(alpha),
     Cmask_(Cmask),
     debug_(dict.lookupOrDefault<bool>("debug", false)),
@@ -126,12 +126,6 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     
     const volScalarField gradAlphaf(gradFrom & gradTo);
 
-    const vector xDir(1, 0, 0);
-    const vector yDir(0, 1, 0);
-    const vector zDir(0, 0, 1);
-    const vector dir210(0.447, 0.894, 0);
-    const vector dir210Neg(0.447, -0.894, 0);
-
     dimensionedScalar VSUnit
     (
         "VSUnit",
@@ -140,36 +134,54 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
     );
 
     //- construct directional gradient to track interface norm
-    const volScalarField xDirGradSolid
-    (
-        "xDirGradSolid",
-        (gradTo & xDir) 
-    );
+    if (debug_)
+    {
+        const vector xDir(1, 0, 0);
+        const vector yDir(0, 1, 0);
+        const vector zDir(0, 0, 1);
+        const vector dir210(0.447, 0.894, 0);
+        const vector dir210Neg(0.447, -0.894, 0);
 
-    const volScalarField yDirGradSolid
-    (
-        "yDirGradSolid",
-        (gradTo & yDir) 
-    );
+        const volScalarField xDirGradSolid
+        (
+            "xDirGradSolid",
+            (gradTo & xDir) 
+        );
 
-    const volScalarField zDirGradSolid
-    (
-        "zDirGradSolid",
-        (gradTo & zDir) 
-    );
+        const volScalarField yDirGradSolid
+        (
+            "yDirGradSolid",
+            (gradTo & yDir) 
+        );
 
-    const volScalarField dir210GradSolid
-    (
-        "dir210GradSolid",
-        (gradTo & dir210) 
-    );
+        const volScalarField zDirGradSolid
+        (
+            "zDirGradSolid",
+            (gradTo & zDir) 
+        );
 
-    const volScalarField dir210NegGradSolid
-    (
-        "dir210NegGradSolid",
-        (gradTo & dir210Neg) 
-    );
+        const volScalarField dir210GradSolid
+        (
+            "dir210GradSolid",
+            (gradTo & dir210) 
+        );
 
+        const volScalarField dir210NegGradSolid
+        (
+            "dir210NegGradSolid",
+            (gradTo & dir210Neg) 
+        );
+
+        if (mesh_.time().outputTime())
+        {
+            xDirGradSolid.write();
+            yDirGradSolid.write();
+            zDirGradSolid.write();
+            dir210GradSolid.write();
+            dir210NegGradSolid.write();
+        }
+    }
+    
     //- Update the reaction constant field basing on surface norm
     tmp<volScalarField> tkConst
     (
@@ -357,11 +369,6 @@ Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarF
         areaDensityGrad.write();
         //Cmask.write();
         to.write();
-        xDirGradSolid.write();
-        yDirGradSolid.write();
-        zDirGradSolid.write();
-        dir210GradSolid.write();
-        dir210NegGradSolid.write();
         kConst.write();
 //            volScalarField mKGasDot
 //            (
@@ -573,17 +580,17 @@ void Foam::phaseChangeReaction::updateCmask()
     //- Readjust in next version for better coding
     const volScalarField& from = alpha_;
 
-    const volScalarField to
+    volScalarField to
     (
         "to",
         1.0-alpha_
     );
+    to.correctBoundaryConditions();
 
     const volVectorField gradFrom(fvc::grad(from));
     const volVectorField gradTo(fvc::grad(to));
     const volScalarField gradAlphaf(gradFrom & gradTo);
 
-    Cmask_.correctBoundaryConditions();
     Info<< "calculate Cmask..." <<endl;
 
     // mark cells that is next to the solid phase cell
@@ -628,7 +635,7 @@ void Foam::phaseChangeReaction::updateCmask()
     //- check mesh boundaries of the processor
     forAll(mesh_.boundaryMesh(), patchI)
     {
-        const fvPatchScalarField& pf = from.boundaryField()[patchI];
+        const fvPatchScalarField& pf = to.boundaryField()[patchI];
         const labelList& faceCells = pf.patch().faceCells();
 
         //- Coupled boundaries (processor, cylic, etc)
@@ -638,7 +645,13 @@ void Foam::phaseChangeReaction::updateCmask()
 
             forAll(faceCells, faceI)
             {
-                if (neighbors[faceI] <= (1.0-alphaSolidMin_))
+                if (neighbors[faceI]>alphaSolidMin_)
+                {
+                    Info<< faceI << endl;
+                    Info<< neighbors[faceI] << endl;
+                }
+                
+                if (neighbors[faceI] >= alphaSolidMin_)
                 {
                     Cmask_[faceCells[faceI]] = 1.0;
                 }
