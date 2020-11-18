@@ -267,6 +267,7 @@ scalar conSat = inputParameters.lookupOrDefault<scalar>("Cactivate", 1.0);
 
 //- initial nucleation vof
 scalar nuIntVof = inputParameters.lookupOrDefault<scalar>("nucleationVof", 1e-6);
+scalar nuIntVofCut = inputParameters.lookupOrDefault<scalar>("nucleationVofCut", 0.5);
 
 #include "createMRF.H"
 #include "createFvOptions.H"

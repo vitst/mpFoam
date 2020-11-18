@@ -91,13 +91,19 @@ Foam::phaseChangeReaction::phaseChangeReaction
 
 Foam::tmp<Foam::volScalarField> Foam::phaseChangeReaction::Kexp(const volScalarField& field)
 {
-    const volScalarField& from = alpha_;
+    volScalarField from
+    (
+        "from",
+        alpha_
+    );
+    from.correctBoundaryConditions();
 
-    const volScalarField to
+    volScalarField to
     (
         "to",
         1.0-alpha_
     );
+    to.correctBoundaryConditions();
 
     Info<< "alpha from max/min: "<< max(from).value() << ", " << min(from).value() << endl;
     Info<< "alpha to max/min: "<< max(to).value() << ", " << min(to).value() << endl;
@@ -529,11 +535,11 @@ void Foam::phaseChangeReaction::updateCmask()
 
             forAll(faceCells, faceI)
             {
-                if (neighbors[faceI]>alphaSolidMin_)
-                {
-                    Info<< faceI << endl;
-                    Info<< neighbors[faceI] << endl;
-                }
+                //if (neighbors[faceI]>alphaSolidMin_)
+                //{
+                //    Info<< faceI << endl;
+                //    Info<< neighbors[faceI] << endl;
+                //}
                 
                 if (neighbors[faceI] >= alphaSolidMin_)
                 {
@@ -554,6 +560,43 @@ void Foam::phaseChangeReaction::nuSiteCal
     dimensionedScalar& nuTotal_
 )
 {
+    //Create tmp nucleation field
+    tmp<volScalarField> nuSitePerStep
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "nuSitePerStep",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& nuSitePerStepRef = nuSitePerStep.ref();
+
+    tmp<volScalarField> wallMarker
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "wallMarker",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& wallMarkerRef = wallMarker.ref();
+
     //Calculate the possibilities for nucleation
     tmp<volScalarField> nuRate = nuRateCal();
     nuRateOut = nuRate.ref();
@@ -577,17 +620,32 @@ void Foam::phaseChangeReaction::nuSiteCal
             }
         }
     }
+    Pout << "Wall list size: "<< wallList.size() << endl;
 
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::default_random_engine generator(rd());
+    
+    dimensionedScalar totSufArea(0.0);
+    dimensionedScalar nuRateAccum(0.0);
+    dimensionedScalar averNuRate(0.0);
+
+    scalar faceArea = 0.0;
 
     forAll(wallList, i)
     {
-        label poss = rand() % 1000000000000 + 1;
+        //label poss = rand() % 1000000000000 + 1;
+        //const labelListList& cellFaces = mesh_.cellFaces()[wallList[i]];
+
+        //Mark out cells next to wall BC
+        wallMarkerRef[wallList[i]] = 1.0;
+
         const cell& faces = mesh_.cells()[wallList[i]];
-        scalar faceArea = 0.0;
+
+        //scalar faceArea = mesh_.magSf()[wallList[i]];
+        //Info << "Face ID: " << faces << endl;
         forAll(faces, faceI)
         {
+            //Info << faceI << ": " << mesh_.magSf()[faces[faceI]] << endl;
             if(mesh_.magSf()[faceI]>faceArea)
             {
                 faceArea = mesh_.magSf()[faceI];
@@ -611,18 +669,44 @@ void Foam::phaseChangeReaction::nuSiteCal
 
         if((nuRate.ref()[wallList[i]])>randNum)
         {
+            nuSitePerStepRef[wallList[i]] = 1.0;
             nuSite[wallList[i]] = 1.0;
             Cmask_[wallList[i]] = 1.0;
             if(alpha_[wallList[i]] > 0.5)
             {
-                nuTotal_.value() += 1.0;
+                //nuTotal_.value() += 1.0;
                 Info<< "New nucleation site found: " << nuRate.ref()[wallList[i]] << " > " << randNum << endl;
             }
         }
         // mark cells for check, remove in running code
         // nuSite[wallList[i]] = 1.0;
+
+        // calculate the available surface area
+        //totSufArea.value() += faceArea*alpha_[wallList[i]];
+        //nuRateAccum.value() += nuRate.ref()[wallList[i]]*faceArea*alpha_[wallList[i]];
     }
+    nuTotal_.value() += gSum((nuSitePerStepRef)());
+    totSufArea.value() = gSum((faceArea*wallMarkerRef*alpha_)());
+    nuRateAccum.value() = gSum((faceArea*wallMarkerRef*alpha_*nuRate.ref())());
+
     Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
+    averNuRate.value() = nuRateAccum.value()/totSufArea.value();
+
+    // output available surface area
+    if(Pstream::master() && mesh_.time().outputTime())
+    {
+        string fileName = "nucleationSurfaceArea.csv";
+        std::ifstream file(fileName);
+        std::fstream fout;
+        fout.open(fileName, std::ios::out | std::ios::app);
+        if (file.peek() == std::ifstream::traits_type::eof())
+        {
+            fout << "Time[s],totSufArea,averNuRate" << "\n";
+        }
+        fout << mesh_.time().timeName() << ", "
+            << totSufArea.value() << ", "
+            << averNuRate.value() << "\n";
+    }
 
 }
 

@@ -162,9 +162,9 @@
         // generating nucleation site for empty cell next to wall BC
         forAll(mesh.C(), cellI)
         {
-            if((nuSite[cellI]==1.0) && (alpha1[cellI]>(1.0-nuIntVof)))
+            if((nuSite[cellI]==1.0) && (alpha1[cellI]>nuIntVofCut))
             {
-                alpha1[cellI] = 1.0-nuIntVof;
+                alpha1[cellI] -= nuIntVof;
             }
         }
 
