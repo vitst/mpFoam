@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "mpFoam.C": "cpp",
+        "precipitate.C": "cpp",
+        "MassTransferPhaseSystem.C": "cpp"
+    }
+}

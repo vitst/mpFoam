@@ -1,3 +1,26 @@
+    Info<< "Reading personlized input parameters" << endl;
+    IOdictionary inputParameters
+(
+    IOobject
+    (
+        "inputParameters",
+        runTime.constant(),
+        mesh,
+        IOobject::MUST_READ_IF_MODIFIED,
+        IOobject::NO_WRITE
+    )
+);
+
+    // Molar weight of precipitated species
+    dimensionedScalar molW
+    (
+	"molW",
+	dimMass/dimMoles,
+	inputParameters
+    );
+
+    Info<< "The molar weight of solid is set as: \n" << molW << endl;
+
     Info<< "Reading field p_rgh\n" << endl;
     volScalarField p_rgh
     (
@@ -56,6 +79,19 @@
         mesh
     );
 
+    volScalarField SuOut 
+    (
+        IOobject
+        (
+            "SuOut",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    );
+
     Info<< "Reading field diffusion coefficient for C field\n" << endl;
     volScalarField diffCo
     (
@@ -69,21 +105,6 @@
 	),
 	mesh
     );
-
-    Info<< "Reading field alpha_solid\n" << endl;
-    volScalarField alpha_solid
-    (
-        IOobject
-        (
-            "alpha.solid",
-            runTime.timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh
-    );
-
 
     Info<< "Calculating field g.h\n" << endl;
     #include "readGravitationalAcceleration.H"

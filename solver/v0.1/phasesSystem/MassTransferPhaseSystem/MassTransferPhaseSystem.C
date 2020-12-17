@@ -165,12 +165,123 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::dmdt
 
     if (dmdt_.found(key))
     {
+	Info<<"dmdt with key "<<key<<endl;
         dmdt = *dmdt_[key];
+	Info<<"dmdt min/max "<<min(dmdt).value()<< " / " << max(dmdt).value()<<endl;
     }
 
     return tdmdt;
 }
 
+template<class BasePhaseSystem>
+Foam::tmp<Foam::fvScalarMatrix>
+Foam::MassTransferPhaseSystem<BasePhaseSystem>::preRect
+(
+    const volScalarField& C,
+    const dimensionedScalar& molW,
+    volScalarField& SuOutput
+)
+{
+    tmp<fvScalarMatrix> cEqnPtr
+    (
+        new fvScalarMatrix(C, dimMoles/dimTime)
+    );
+
+    fvScalarMatrix& eqn = cEqnPtr.ref();
+
+
+    forAllConstIters(this->phaseModels_, iteri)
+    {
+        const phaseModel& phasei = iteri()();
+
+        auto iterk = iteri;
+
+        for (++iterk; iterk != this->phaseModels_.end(); ++iterk)
+        {
+            if (iteri()().name() != iterk()().name())
+            {
+                const phaseModel& phasek = iterk()();
+
+                // Phase i to phase k
+                const phasePairKey keyik(phasei.name(), phasek.name(), true);
+
+                // Phase k to phase i
+                const phasePairKey keyki(phasek.name(), phasei.name(), true);
+
+                // Net mass transfer from k to i phase
+                tmp<volScalarField> cdmdtNetki
+                (
+                    new volScalarField
+                    (
+                        IOobject
+                        (
+                            "cdmdtYki",
+                            this->mesh().time().timeName(),
+                            this->mesh(),
+                            IOobject::NO_READ,
+                            IOobject::NO_WRITE
+                        ),
+                        this->mesh(),
+                        dimensionedScalar(dimDensity/dimTime, Zero)
+                    )
+                );
+                volScalarField& dmdtNetki = cdmdtNetki.ref();
+
+
+                if (massTransferModels_.found(keyik))
+                {
+                    autoPtr<interfaceCompositionModel>& interfacePtr =
+                        massTransferModels_[keyik];
+
+                    // Explicit mass transfer rate
+                    tmp<volScalarField> Kexp =
+                        interfacePtr->Kexp(interfaceCompositionModel::T, C);
+
+                    if (Kexp.valid())
+                    {
+			Info<< "Fluid to solid calculated!" << endl;
+                        dmdtNetki += Kexp.ref();
+                        *dmdt_[keyik] = Kexp.ref();
+		
+                    }
+                }
+                Info<< "keyik "<< keyik << endl;
+		Info<< "Reaction rate(min/max): " << min(dmdtNetki).value() << ", " << max(dmdtNetki).value() << endl;	
+                // Looking for mass transfer in the other direction (k to i)
+                if (massTransferModels_.found(keyki))
+                {
+                    autoPtr<interfaceCompositionModel>& interfacePtr =
+                        massTransferModels_[keyki];
+
+                    // Explicit temperature mass transfer rate
+                    const tmp<volScalarField> Kexp =
+                        interfacePtr->Kexp(interfaceCompositionModel::T, C);
+
+                    if (Kexp.valid())
+                    {
+			Info<< "Solid to fluid calculated!" << endl;
+                        dmdtNetki -= Kexp.ref();
+                        *dmdt_[keyki] = Kexp.ref();
+			
+                    }
+                }
+
+                word keyikName(phasei.name() + phasek.name());
+                word keykiName(phasek.name() + phasei.name());
+
+		Info<< "keyki "<< keyki << endl;
+		Info<< "Reaction rate(min/max): " << min(dmdtNetki).value() << ", " << max(dmdtNetki).value() << endl;
+		SuOutput = dmdtNetki;
+                eqn -=
+                    (
+                        dmdtNetki/molW
+                    );
+            }
+        }
+    }
+    return cEqnPtr;
+
+}
 
 template<class BasePhaseSystem>
 Foam::tmp<Foam::fvScalarMatrix>
@@ -235,7 +346,7 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::heatTransfer
 
                     if (Kexp.valid())
                     {
-                        dmdtNetki -= Kexp.ref();
+                        dmdtNetki += Kexp.ref();
                         *dmdt_[keyik] = Kexp.ref();
                     }
                 }
@@ -252,7 +363,7 @@ Foam::MassTransferPhaseSystem<BasePhaseSystem>::heatTransfer
 
                     if (Kexp.valid())
                     {
-                        dmdtNetki += Kexp.ref();
+                        dmdtNetki -= Kexp.ref();
                         *dmdt_[keyki] = Kexp.ref();
                     }
 

@@ -1,0 +1,20 @@
+{
+    "files.associations": {
+        "MultiComponentPhaseModel.C": "cpp",
+        "phaseSystem.C": "cpp",
+        "multiphaseSystem.C": "cpp",
+        "StaticPhaseModel.C": "cpp",
+        "MassTransferPhaseSystem.C": "cpp",
+        "precipitate.C": "cpp",
+        "Lee.C": "cpp",
+        "kineticGasEvaporation.C": "cpp",
+        "interfaceCompositionModel.C": "cpp",
+        "mpFoam.C": "cpp",
+        "phaseModel.C": "cpp",
+        "phaseModelNew.C": "cpp",
+        "PurePhaseModel.C": "cpp",
+        "phaseModels.C": "cpp",
+        "multiphaseSystemNew.C": "cpp",
+        "phasePair.C": "cpp"
+    }
+}

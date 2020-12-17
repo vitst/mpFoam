@@ -24,52 +24,114 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::meltingEvaporationModels::precipitate
+    Foam::meltingEvaporationModels::kineticGasEvaporation
 
 Description
+    Considering the Hertz Knudsen formula, which gives the
+    evaporation-condensation flux based on the kinetic theory for flat
+    interface:
+
+    \f[
+        Flux = C \sqrt{\frac{M}{2 \pi R T_{activate}}}(p - p_{sat})
+    \f]
+
+        where:
+        \vartable
+            Flux    | mass flux rate [kg/s/m2]
+            M       | molecular weight
+            T_{activate} | saturation temperature
+            C       | accomodation coefficient
+            R       | universal gas constant
+            p_{sat} | saturation pressure
+            p       | vapor partial pressure
+        \endvartable
+
+    The Clapeyron-Clausius equation relates the pressure to the temperature
+    for the saturation condition:
+
+    \f[
+        \frac{dp}{dT} = - \frac{L}{T (\nu_v - \nu_l)}
+    \f]
+
+        where:
+        \vartable
+            L       | latent heat
+            \nu_v   | inverse of the vapor density
+            \nu_l   | inverse of the liquid density
+         \endvartable
+
+
+    Using the above relations:
+
+    \f[
+        Flux =
+           2 \frac{C}{2 - C}
+           \sqrt{\frac{M}{2 \pi R T_{activate}}}
+           L (\rho_{v}*\rho_{l}/(\rho_{l} - \rho_{v}))
+           (T - T_{activate})/T_{activate}
+    \f]
+
+    This assumes liquid and vapour are in equilibrium, then the accomodation
+    coefficient are equivalent for the interface. This relation is known as the
+    Hertz-Knudsen-Schrage.
+
+    Based on the reference:
+    - Van P. Carey, Liquid-Vapor Phase Change Phenomena, ISBN 0-89116836,
+      1992, pp. 112-121.
+
 
 Usage
+
     Example usage:
     \verbatim
-        massTransferModel
-        (
-            (solid to liquid)
-            {
-                type            precipitate;
-                C               40;
-                Cactivate       302.78;
-            }
-        );
+    massTransferModel
+    (
+        (liquid to gas)
+        {
+            type                kineticGasEvaporation;
+            species             vapour.gas;
+            C                   0.1;
+            alphaMin            0.0;
+            alphaMax            0.2;
+            Tactivate           373;
+        }
+    );
     \endverbatim
 
-    Where:
-
+    where:
     \table
-        Property    | Description            | Required    | Default value
-        Cactivate   | Activation temperature | yes
-        C           | Model constant         | yes
+        Property    | Description             | Required    | Default value
+        C           | Accomodation coefficient (C > 0 for evaporation, C < 0 for
+            condensation) | yes
+        alphaMin    | Minimum value of alpha  | no          | 0.0
+        alphaMax    | Maximum values of alpha | no          | 0.5
+        Tactivate   | Saturation temperature  | yes
+        species     | Specie name on the other phase | yes
     \endtable
 
 SourceFiles
-    precipitate.C
+    kineticGasEvaporation.C
 
 \*---------------------------------------------------------------------------*/
 
 #ifndef meltingEvaporationModels_precipitate_H
 #define meltingEvaporationModels_precipitate_H
 
-#include "InterfaceCompositionModel.H"
 
+#include "InterfaceCompositionModel.H"
 
 // * * * * * * * * * * * * * * * * *  * * * * * * * * * * * * * * * * * * * *//
 
 namespace Foam
 {
+
+class phasePair;
+
 namespace meltingEvaporationModels
 {
 
 /*---------------------------------------------------------------------------*\
-                                  Class precipitate
+                         Class kineticGasEvaporation
 \*---------------------------------------------------------------------------*/
 
 template<class Thermo, class OtherThermo>
@@ -79,14 +141,29 @@ class precipitate
 {
     // Private data
 
-        //- Condensation coefficient [1/s]
+        //- Evaporation coefficient
         dimensionedScalar C_;
 
-        //- Phase transition concentration 
+        //- Activation temperature
         const dimensionedScalar Tactivate_;
+        const dimensionedScalar Cactivate_;
 
-        //- Phase minimum value for activation
+
+        //- Molar weight of the vapour in the continous phase
+        dimensionedScalar Mv_;
+
+        //- 'To' phase maximum value for the mass transfer
+        scalar alphaMax_;
+
+        //- 'To' phase minumum value for the mass transfer
         scalar alphaMin_;
+
+        //- 'To' phase minumum value for the surface identification
+        scalar alphaSolidMin_;
+
+
+        //- Alpha maximum for the rest of phases
+        scalar alphaRestMax_;
 
 
 public:
@@ -118,7 +195,7 @@ public:
             const volScalarField& field
         );
 
-        //- Return T transition between phases
+        //- Return Tactivate
         virtual const dimensionedScalar& Tactivate() const;
 };
 
@@ -135,7 +212,6 @@ public:
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
 #endif
 
 // ************************************************************************* //
