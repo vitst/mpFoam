@@ -1,9 +1,0 @@
-#!/bin/bash
-
-blockMesh 2>&1 | tee log.blockmesh
-
-decomposePar -copyUniform -cellDist 2>&1 | tee log.decompose
-
-mpirun -n 16 snappyHexMesh -overwrite -parallel 2>&1 | tee log.SHM
-
-reconstructParMesh -constant 2>&1 | tee log.reconstruct
