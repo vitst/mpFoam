@@ -686,8 +686,9 @@ void Foam::phaseChangeReaction::nuSiteCal
         //nuRateAccum.value() += nuRate.ref()[wallList[i]]*faceArea*alpha_[wallList[i]];
     }
     nuTotal_.value() += gSum((nuSitePerStepRef)());
-    totSufArea.value() = gSum((faceArea*wallMarkerRef*alpha_)());
-    nuRateAccum.value() = gSum((faceArea*wallMarkerRef*alpha_*nuRate.ref())());
+
+    totSufArea.value() = gSum((faceArea*wallMarkerRef*alpha_*pos(alpha_-0.1))())+VSMALL;
+    nuRateAccum.value() = gSum((faceArea*wallMarkerRef*alpha_*nuRate.ref()*pos(alpha_-0.1))());
 
     Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
     averNuRate.value() = nuRateAccum.value()/totSufArea.value();
