@@ -499,12 +499,56 @@ void Foam::phaseChangeReaction::updateCmask()
         }
         //- check nearby cell within same processor
         bool flag = false;
+        labelListList cellCellsHolder;
+        cellCellsHolder.clear();
+
         forAll(mesh_.cellCells()[celli],cellj)
         {
             if (to[celli] > alphaSolidMin_)
             {
                 Cmask_[mesh_.cellCells()[celli][cellj]] = 1.0;
+
+                //- store cellCells lists of adjacent cells
+                label dirNearbyCellMarker = mesh_.cellCells()[celli][cellj];
+                cellCellsHolder.resize(cellCellsHolder.size()+1);
+                labelList dirNearbyCellCells = mesh_.cellCells()[dirNearbyCellMarker];
+                cellCellsHolder.append(dirNearbyCellCells);
+                Info<< dirNearbyCellCells << endl;
+
                 flag = true;
+            }
+        }
+
+        //- enable corner cell growth for cartisian grid
+        if(flag == true)
+        {
+            labelList cornerCellList;
+            cornerCellList.clear();
+            forAll(cellCellsHolder, iterI)
+            {
+                forAll(cellCellsHolder, iterJ)
+                {
+                    if(iterI != iterJ)
+                    {
+                        forAll(cellCellsHolder[iterI], labelI)
+                        {
+                            if(cellCellsHolder[iterJ].found(cellCellsHolder[iterI][labelI]))
+                            {
+                                if(!cornerCellList.found(cellCellsHolder[iterI][labelI]))
+                                {
+                                    cornerCellList.append(cellCellsHolder[iterI][labelI]);
+                                }
+                            }                            
+                        }
+                    }
+                }
+            }
+            Info<< "corner cell list: " << cornerCellList << endl;
+
+
+            forAll(cornerCellList, cellI)
+            {
+                Cmask_[cornerCellList[cellI]] = 1.0;
             }
         }
 
