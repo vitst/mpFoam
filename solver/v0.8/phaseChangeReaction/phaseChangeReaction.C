@@ -74,6 +74,7 @@ Foam::phaseChangeReaction::phaseChangeReaction
     alphaRestMax_(dict.lookupOrDefault<scalar>("alphaRestMax", 0.01)),
     smoothSurface_(dict.lookupOrDefault<bool>("smoothSurface", false)),
     smoothAreaDensity_(dict.lookupOrDefault<scalar>("smoothAreaDensity", 1.0)),
+    cornerCell_(dict.lookupOrDefault<bool>("cornerCell", false)),
     gradLim_(dict.lookupOrDefault<scalar>("gradientLimit", 1e20)),
     alpha_(alpha),
     Cmask_(Cmask),
@@ -513,14 +514,14 @@ void Foam::phaseChangeReaction::updateCmask()
                 cellCellsHolder.resize(cellCellsHolder.size()+1);
                 labelList dirNearbyCellCells = mesh_.cellCells()[dirNearbyCellMarker];
                 cellCellsHolder.append(dirNearbyCellCells);
-                Info<< dirNearbyCellCells << endl;
+                //Info<< dirNearbyCellCells << endl;
 
                 flag = true;
             }
         }
 
         //- enable corner cell growth for cartisian grid
-        if(flag == true)
+        if(flag == true && cornerCell_ == true)
         {
             labelList cornerCellList;
             cornerCellList.clear();
@@ -543,7 +544,7 @@ void Foam::phaseChangeReaction::updateCmask()
                     }
                 }
             }
-            Info<< "corner cell list: " << cornerCellList << endl;
+            //Info<< "corner cell list: " << cornerCellList << endl;
 
 
             forAll(cornerCellList, cellI)
@@ -633,13 +634,31 @@ void Foam::phaseChangeReaction::nuSiteCal
                 mesh_.time().timeName(),
                 mesh_,
                 IOobject::NO_READ,
-                IOobject::NO_WRITE
+                IOobject::AUTO_WRITE
             ),
             mesh_,
             dimensionedScalar(dimless, Zero)
         )
     );
     volScalarField& wallMarkerRef = wallMarker.ref();
+
+    tmp<volScalarField> faceAreaTmp
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "faceAreaTmp",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh_,
+            dimensionedScalar(dimless, Zero)
+        )
+    );
+    volScalarField& faceAreaTmpRef = faceAreaTmp.ref();
 
     //Calculate the possibilities for nucleation
     tmp<volScalarField> nuRate = nuRateCal();
@@ -664,7 +683,7 @@ void Foam::phaseChangeReaction::nuSiteCal
             }
         }
     }
-    Pout << "Wall list size: "<< wallList.size() << endl;
+    //Pout << "Wall list size: "<< wallList.size() << endl;
 
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::default_random_engine generator(rd());
@@ -672,8 +691,6 @@ void Foam::phaseChangeReaction::nuSiteCal
     dimensionedScalar totSufArea(0.0);
     dimensionedScalar nuRateAccum(0.0);
     dimensionedScalar averNuRate(0.0);
-
-    scalar faceArea = 0.0;
 
     forAll(wallList, i)
     {
@@ -687,24 +704,39 @@ void Foam::phaseChangeReaction::nuSiteCal
 
         //scalar faceArea = mesh_.magSf()[wallList[i]];
         //Info << "Face ID: " << faces << endl;
+        //forAll(faces, faceI)
+        //{
+        //    //Info << faceI << ": " << mesh_.magSf()[faces[faceI]] << endl;
+        //    if(mesh_.magSf()[faceI]>faceArea)
+        //    {
+        //        faceArea = mesh_.magSf()[faceI];
+        //    }
+        //}
+
+        //Info << faces << endl;
+
+        //Info << mesh_.magSf()[faces[0]] << endl;
+
+        faceAreaTmpRef[wallList[i]] = 0.0;
         forAll(faces, faceI)
         {
             //Info << faceI << ": " << mesh_.magSf()[faces[faceI]] << endl;
-            if(mesh_.magSf()[faceI]>faceArea)
+            if((mesh_.magSf()[faces[faceI]]>faceAreaTmpRef[wallList[i]]) && (mesh_.magSf()[faces[faceI]] < 2e-12))
             {
-                faceArea = mesh_.magSf()[faceI];
+                faceAreaTmpRef[wallList[i]] = mesh_.magSf()[faces[faceI]];
             }
         }
+        //Info << faceAreaTmpRef[wallList[i]] << endl;
 
         std::random_device rd;  //Will be used to obtain a seed for the random number engine
         std::default_random_engine generator(rd());
-        scalar upperLim = 1.0/faceArea;
+        scalar upperLim = 1.0/(faceAreaTmpRef[wallList[i]]);
         std::uniform_int_distribution<long long unsigned> dis(1, static_cast<long long unsigned>(upperLim));
         scalar randNum = dis(generator);
 
         if(debug_)
         {
-            Info<< "Max faceArea: " << faceArea << endl;
+            //Info<< "Max faceArea: " << faceArea << endl;
             //cout<< "Total cell counts per unit area: " << upper << endl;
             Info<< "Random integer generated: " << randNum << endl;
             Info<< "Nucleation rate: " << nuRate.ref()[wallList[i]] << endl;
@@ -729,10 +761,13 @@ void Foam::phaseChangeReaction::nuSiteCal
         //totSufArea.value() += faceArea*alpha_[wallList[i]];
         //nuRateAccum.value() += nuRate.ref()[wallList[i]]*faceArea*alpha_[wallList[i]];
     }
+
+    Info<< "Max/Min cell surface Area(m2): " << max(faceAreaTmpRef).value() << ", " << min(faceAreaTmpRef).value()<< endl;
+
     nuTotal_.value() += gSum((nuSitePerStepRef)());
 
-    totSufArea.value() = gSum((faceArea*wallMarkerRef*alpha_*pos(alpha_-0.1))())+VSMALL;
-    nuRateAccum.value() = gSum((faceArea*wallMarkerRef*alpha_*nuRate.ref()*pos(alpha_-0.1))());
+    totSufArea.value() = gSum((faceAreaTmpRef*wallMarkerRef*alpha_*pos(alpha_-0.1))())+VSMALL;
+    nuRateAccum.value() = gSum((faceAreaTmpRef*wallMarkerRef*alpha_*nuRate.ref()*pos(alpha_-0.1))());
 
     Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
     averNuRate.value() = nuRateAccum.value()/totSufArea.value();
@@ -751,6 +786,15 @@ void Foam::phaseChangeReaction::nuSiteCal
         fout << mesh_.time().timeName() << ", "
             << totSufArea.value() << ", "
             << averNuRate.value() << "\n";
+    }
+
+    if(debug_)
+    {
+        if (mesh_.time().outputTime())
+        {
+            faceAreaTmpRef.write();
+            wallMarkerRef.write();
+        }
     }
 
 }

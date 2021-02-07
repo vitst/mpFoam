@@ -120,6 +120,9 @@ protected:
         //- User input smooth surface areaDensity constant [m2/m3]
         scalar smoothAreaDensity_;
 
+        //- Option for enable corner cell Cmask growth
+        bool cornerCell_;
+
         //- User input vof gradient limit for enable growth [1/m]
         scalar gradLim_;
 
