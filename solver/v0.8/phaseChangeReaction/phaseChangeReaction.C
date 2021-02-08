@@ -730,7 +730,7 @@ void Foam::phaseChangeReaction::nuSiteCal
 
         std::random_device rd;  //Will be used to obtain a seed for the random number engine
         std::default_random_engine generator(rd());
-        scalar upperLim = 1.0/(faceAreaTmpRef[wallList[i]]);
+        scalar upperLim = 1.0/(faceAreaTmpRef[wallList[i]]+ROOTVSMALL);
         std::uniform_int_distribution<long long unsigned> dis(1, static_cast<long long unsigned>(upperLim));
         scalar randNum = dis(generator);
 
