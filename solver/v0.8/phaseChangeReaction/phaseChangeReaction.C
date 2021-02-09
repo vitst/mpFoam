@@ -732,7 +732,7 @@ void Foam::phaseChangeReaction::nuSiteCal
         //        faceAreaTmpRef[wallList[i]] = mesh_.magSf()[faces[faceI]];
         //    }
         //}
-        Pout << faceAreaTmpRef[wallList[i]] << endl;
+        //Pout << faceAreaTmpRef[wallList[i]] << endl;
 
         std::random_device rd;  //Will be used to obtain a seed for the random number engine
         std::default_random_engine generator(rd());
@@ -801,11 +801,6 @@ void Foam::phaseChangeReaction::nuSiteCal
             faceAreaTmpRef.write();
             //wallMarkerRef.write();
         }
-    }
-    if (mesh_.time().outputTime())
-    {
-        faceAreaTmpRef.write();
-        //wallMarkerRef.write();
     }
 }
 
