@@ -670,6 +670,9 @@ void Foam::phaseChangeReaction::nuSiteCal
     labelList wallList;
     wallList.clear();
 
+    scalarList faceAreaList;
+    faceAreaList.clear();
+
     forAll(patches, patchI)
     {
         const fvPatch& p = patches[patchI];
@@ -680,6 +683,9 @@ void Foam::phaseChangeReaction::nuSiteCal
                 label faceCelli = p.faceCells()[pFaceI];
                 wallList.resize(wallList.size()+1);
                 wallList[wallList.size()-1]=faceCelli;
+                scalar faceCellAreai = mesh_.magSf().boundaryField()[patchI][pFaceI];
+                faceAreaList.resize(faceAreaList.size()+1);
+                faceAreaList[faceAreaList.size()-1]=faceCellAreai;
             }
         }
     }
@@ -717,20 +723,20 @@ void Foam::phaseChangeReaction::nuSiteCal
 
         //Info << mesh_.magSf()[faces[0]] << endl;
 
-        faceAreaTmpRef[wallList[i]] = 0.0;
-        forAll(faces, faceI)
-        {
-            //Info << faceI << ": " << mesh_.magSf()[faces[faceI]] << endl;
-            if((mesh_.magSf()[faces[faceI]]>faceAreaTmpRef[wallList[i]]) && (mesh_.magSf()[faces[faceI]] < 2e-12))
-            {
-                faceAreaTmpRef[wallList[i]] = mesh_.magSf()[faces[faceI]];
-            }
-        }
-        //Info << faceAreaTmpRef[wallList[i]] << endl;
+        faceAreaTmpRef[wallList[i]] = faceAreaList[i];
+        //forAll(faces, faceI)
+        //{
+        //    //Info << faceI << ": " << mesh_.magSf()[faces[faceI]] << endl;
+        //    if((mesh_.magSf()[faces[faceI]]>faceAreaTmpRef[wallList[i]]) && (mesh_.magSf()[faces[faceI]] < 2e-12))
+        //    {
+        //        faceAreaTmpRef[wallList[i]] = mesh_.magSf()[faces[faceI]];
+        //    }
+        //}
+        Info << faceAreaTmpRef[wallList[i]] << endl;
 
         std::random_device rd;  //Will be used to obtain a seed for the random number engine
         std::default_random_engine generator(rd());
-        scalar upperLim = 1.0/(faceAreaTmpRef[wallList[i]]+ROOTVSMALL);
+        scalar upperLim = 1.0/(faceAreaTmpRef[wallList[i]]+VSMALL);
         std::uniform_int_distribution<long long unsigned> dis(1, static_cast<long long unsigned>(upperLim));
         scalar randNum = dis(generator);
 
@@ -796,7 +802,6 @@ void Foam::phaseChangeReaction::nuSiteCal
             wallMarkerRef.write();
         }
     }
-
 }
 
 Foam::tmp<Foam::volScalarField> 
