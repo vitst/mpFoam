@@ -624,23 +624,23 @@ void Foam::phaseChangeReaction::nuSiteCal
     );
     volScalarField& nuSitePerStepRef = nuSitePerStep.ref();
 
-    tmp<volScalarField> wallMarker
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "wallMarker",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            mesh_,
-            dimensionedScalar(dimless, Zero)
-        )
-    );
-    volScalarField& wallMarkerRef = wallMarker.ref();
+    //tmp<volScalarField> wallMarker
+    //(
+    //    new volScalarField
+    //    (
+    //        IOobject
+    //        (
+    //            "wallMarker",
+    //            mesh_.time().timeName(),
+    //            mesh_,
+    //            IOobject::NO_READ,
+    //            IOobject::AUTO_WRITE
+    //        ),
+    //        mesh_,
+    //        dimensionedScalar(dimless, Zero)
+    //    )
+    //);
+    //volScalarField& wallMarkerRef = wallMarker.ref();
 
     tmp<volScalarField> faceAreaTmp
     (
@@ -704,7 +704,7 @@ void Foam::phaseChangeReaction::nuSiteCal
         //const labelListList& cellFaces = mesh_.cellFaces()[wallList[i]];
 
         //Mark out cells next to wall BC
-        wallMarkerRef[wallList[i]] = 1.0;
+        //wallMarkerRef[wallList[i]] = 1.0;
 
         const cell& faces = mesh_.cells()[wallList[i]];
 
@@ -732,7 +732,7 @@ void Foam::phaseChangeReaction::nuSiteCal
         //        faceAreaTmpRef[wallList[i]] = mesh_.magSf()[faces[faceI]];
         //    }
         //}
-        Info << faceAreaTmpRef[wallList[i]] << endl;
+        Pout << faceAreaTmpRef[wallList[i]] << endl;
 
         std::random_device rd;  //Will be used to obtain a seed for the random number engine
         std::default_random_engine generator(rd());
@@ -772,8 +772,8 @@ void Foam::phaseChangeReaction::nuSiteCal
 
     nuTotal_.value() += gSum((nuSitePerStepRef)());
 
-    totSufArea.value() = gSum((faceAreaTmpRef*wallMarkerRef*alpha_*pos(alpha_-0.1))())+VSMALL;
-    nuRateAccum.value() = gSum((faceAreaTmpRef*wallMarkerRef*alpha_*nuRate.ref()*pos(alpha_-0.1))());
+    totSufArea.value() = gSum((faceAreaTmpRef*alpha_*pos(alpha_-0.1))())+VSMALL;
+    nuRateAccum.value() = gSum((faceAreaTmpRef*alpha_*nuRate.ref()*pos(alpha_-0.1))());
 
     Info<< "Total nucleation sites: " << nuTotal_.value() << endl;
     averNuRate.value() = nuRateAccum.value()/totSufArea.value();
@@ -799,8 +799,13 @@ void Foam::phaseChangeReaction::nuSiteCal
         if (mesh_.time().outputTime())
         {
             faceAreaTmpRef.write();
-            wallMarkerRef.write();
+            //wallMarkerRef.write();
         }
+    }
+    if (mesh_.time().outputTime())
+    {
+        faceAreaTmpRef.write();
+        //wallMarkerRef.write();
     }
 }
 
